@@ -1,2 +1,5 @@
-/target
+**/target
 **/*.rs.bk
+**/.vscode
+**/.DS_Store
+sdahci0.img
