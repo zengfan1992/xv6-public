@@ -13,3 +13,6 @@ members = [
     "ulib",
     "xtask",
 ]
+
+[profile.release]
+debug = true
