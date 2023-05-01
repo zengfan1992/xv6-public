@@ -1,0 +1,17 @@
+#!/bin/sh
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o init.o init.c
+ld.lld -N -Ttext 0x1000 -e main -o init init.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o cat.o cat.c
+ld.lld -N -Ttext 0x1000 -e main -o cat cat.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o ls.o ls.c
+ld.lld -N -Ttext 0x1000 -e main -o ls ls.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -fno-stack-protector -nostdinc -nostdlib -c -o sh.o -c sh.c #minish.c
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -fno-stack-protector -nostdinc -nostdlib -c -o stressfs.o stressfs.c
+ld.lld -nostdlib -N -Ttext 0x1000 -e main -o sh sh.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+ld.lld -nostdlib -N -Ttext 0x1000 -e main -o stressfs stressfs.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+cp init _init && strip _init
+cp sh _sh && strip _sh
+cp stressfs _stressfs && strip _stressfs
+cp ls _ls && strip _ls
+cp cat _cat && strip _cat
+../bin/mkfs ../sdahci0.img _init _sh _stressfs _ls _cat
