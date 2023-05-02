@@ -6,8 +6,9 @@
 use crate::arch;
 use crate::param;
 use crate::trap;
+use crate::volatile;
 use bitflags::bitflags;
-use core::ptr::{null_mut, read_volatile, write_volatile};
+use core::ptr::null_mut;
 use core::time::Duration;
 
 enum XAPICRegs {
@@ -80,16 +81,14 @@ pub unsafe fn init() {
 unsafe fn read(index: XAPICRegs) -> u32 {
     assert_ne!(XAPIC, null_mut());
     let xapic = unsafe { &*XAPIC };
-    unsafe { read_volatile(&xapic[index as usize]) }
+    volatile::read(&xapic[index as usize])
 }
 
 unsafe fn write(index: XAPICRegs, value: u32) {
     assert_ne!(XAPIC, null_mut());
     let xapic = unsafe { &mut *XAPIC };
-    unsafe {
-        write_volatile(&mut xapic[index as usize], value);
-        read_volatile(&xapic[XAPICRegs::ID as usize]);
-    }
+    volatile::write(&mut xapic[index as usize], value);
+    volatile::read(&xapic[XAPICRegs::ID as usize]);
 }
 
 unsafe fn wait_delivery() {

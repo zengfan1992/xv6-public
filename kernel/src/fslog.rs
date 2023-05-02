@@ -2,8 +2,9 @@ use crate::bio;
 use crate::fs;
 use crate::param;
 use crate::spinlock::SpinMutex as Mutex;
-use core::intrinsics::volatile_copy_memory;
+use crate::volatile;
 use core::ptr;
+use core::slice;
 use static_assertions::const_assert;
 
 static LOG_STATE: Mutex<LogState> = Mutex::new("log", LogState::new());
@@ -92,15 +93,18 @@ impl Log {
 
     pub fn read(&mut self) {
         bio::with_block(self.dev, self.start, |hb| {
-            let src = hb.data() as *const u64;
-            let len = unsafe { ptr::read(src) } as usize;
-            if len >= param::LOGSIZE || len >= self.size - 1 {
-                panic!("corrupt log too large: {}", len);
+            let src = unsafe {
+                let ptr = hb.data() as *const u64;
+                let len = ptr::read(ptr) as usize;
+                let src = slice::from_raw_parts(ptr, len + 1);
+                &src[1..]
+            };
+            if src.len() >= param::LOGSIZE || src.len() >= self.size - 1 {
+                panic!("corrupt log too large: {}", src.len());
             }
-            let src = unsafe { core::slice::from_raw_parts(src.add(1), len) };
             self.clear();
-            for blockno in src {
-                self.insert(*blockno);
+            for &blockno in src {
+                self.insert(blockno);
             }
         })
         .unwrap();
@@ -108,11 +112,13 @@ impl Log {
 
     pub fn write(&self) {
         bio::with_block(self.dev, self.start, |hb| {
-            let dst = hb.data_mut().as_mut_ptr() as *mut u64;
-            unsafe {
-                ptr::write_volatile(dst, self.len() as u64);
-                volatile_copy_memory(dst.add(1), self.blocks.as_ptr(), self.len);
-            }
+            let dst = unsafe {
+                let dst = hb.data_mut().as_mut_ptr() as *mut u64;
+                let len = param::LOGSIZE + 1;
+                slice::from_raw_parts_mut(dst, len)
+            };
+            volatile::write(&mut dst[0], self.len() as u64);
+            volatile::copy_slice(&mut dst[1..1 + self.len], &self.blocks[..self.len]);
             hb.write();
         })
         .unwrap();
@@ -123,11 +129,9 @@ impl Log {
             let logblockno = self.start + tail as u64 + 1;
             bio::with_block(self.dev, logblockno, |to| {
                 bio::with_block(self.dev, blockno, |from| {
-                    let dst = to.data_mut().as_mut_ptr();
-                    let src = from.data_ref().as_ptr();
-                    unsafe {
-                        volatile_copy_memory(dst, src, fs::BSIZE);
-                    }
+                    let dst = to.data_mut();
+                    let src = from.data_ref();
+                    volatile::copy_slice(dst, src);
                     to.write();
                 })
                 .unwrap();
@@ -141,11 +145,9 @@ impl Log {
             let logblockno = self.start + tail as u64 + 1;
             bio::with_block(self.dev, logblockno, |from| {
                 bio::with_block(self.dev, *blockno, |to| {
-                    let src = from.data_ref().as_ptr();
-                    let dst = to.data_mut().as_mut_ptr();
-                    unsafe {
-                        volatile_copy_memory(dst, src, fs::BSIZE);
-                    }
+                    let src = from.data_ref();
+                    let dst = to.data_mut();
+                    volatile::copy_slice(dst, src);
                     to.write();
                 })
                 .unwrap();

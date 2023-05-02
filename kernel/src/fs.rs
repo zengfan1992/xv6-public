@@ -6,11 +6,11 @@ use crate::param;
 use crate::proc;
 use crate::sleeplock::Sleeplock;
 use crate::spinlock::SpinMutex as Mutex;
+use crate::volatile;
 use crate::Result;
 use core::assert_eq;
 use core::cell::{Cell, RefCell};
 use core::cmp;
-use core::intrinsics::{volatile_copy_memory, volatile_set_memory};
 use core::mem;
 use core::slice;
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -67,8 +67,9 @@ impl Superblock {
     pub fn read(dev: u32) -> Result<Superblock> {
         bio::with_block(dev, ROOTINO, |bp| {
             let mut sb = Self::new();
+            let src = bp.data() as *const Superblock;
             unsafe {
-                volatile_copy_memory(&mut sb, bp.data() as *const Superblock, 1);
+                volatile::copy_ptr(&mut sb, src);
             }
             sb
         })
@@ -138,9 +139,7 @@ impl Dirent {
 // Zero a block.
 fn bzero(dev: u32, blockno: u64) {
     let bp = bio::read(dev, blockno).expect("block read");
-    unsafe {
-        volatile_set_memory(bp.data_mut().as_mut_ptr(), 0, BSIZE);
-    }
+    volatile::zero_slice(bp.data_mut());
     fslog::write(bp);
     bp.relse();
 }
@@ -412,9 +411,7 @@ impl Inode {
         let sb = self.meta.borrow().sb.expect("update requires superblock");
         bio::with_block(self.dev(), sb.iblock(self.inum()), |bp| {
             let di = unsafe { buf_to_dinode(bp, self.inum() as usize) };
-            unsafe {
-                volatile_copy_memory(di, self.dinode.as_ptr(), 1);
-            }
+            volatile::copy(di, &self.dinode.borrow());
             fslog::write(bp);
         })
     }
@@ -436,10 +433,10 @@ impl Inode {
         self.lock.acquire();
         if !self.is_valid() {
             bio::with_block(self.dev(), sb.iblock(self.inum()), |bp| {
+                use core::ops::DerefMut;
                 let di = unsafe { buf_to_dinode(bp, self.inum() as usize) };
-                unsafe {
-                    volatile_copy_memory(self.dinode.as_ptr(), di, 1);
-                }
+                let mut dinode = self.dinode.borrow_mut();
+                volatile::copy(dinode.deref_mut(), di);
             })
             .expect("block read");
             self.valid.set(true);
@@ -584,26 +581,27 @@ impl Inode {
     }
 
     pub fn readi<T>(&self, dst: &mut [T], off: u64) -> Result<usize> {
+        let dst = unsafe {
+            let ptr = dst.as_mut_ptr() as *mut u8;
+            let len = dst.len().checked_mul(mem::size_of::<T>()).expect("mult");
+            slice::from_raw_parts_mut(ptr, len)
+        };
         if off > self.size() {
             return Err("offset beyond end of file");
         }
-        let dstlen = mem::size_of::<T>() * dst.len();
-        if off.wrapping_add(dstlen as u64) < off {
+        if off.wrapping_add(dst.len() as u64) < off {
             return Err("offset and length wrap");
         }
         let mut off = off as usize;
-        let dstptr = dst.as_mut_ptr() as *mut u8;
-        let n = cmp::min(dstlen, self.size() as usize - off);
+        let n = cmp::min(dst.len(), self.size() as usize - off);
         let mut total = 0;
         while total < n {
             bio::with_block(self.dev(), self.bmap((off / BSIZE) as u64)?, |bp| {
                 let boff = off % BSIZE;
                 let m = cmp::min(n - total, BSIZE - boff);
-                unsafe {
-                    let dst = dstptr.add(total);
-                    let src = bp.data_ref().as_ptr().add(boff);
-                    volatile_copy_memory(dst, src, m);
-                }
+                let dst = &mut dst[total..total + m];
+                let src = &bp.data_ref()[boff..boff + m];
+                volatile::copy_slice(dst, src);
                 total += m;
                 off += m;
             })?;
@@ -628,13 +626,9 @@ impl Inode {
             bio::with_block(self.dev(), self.bmap((off / BSIZE) as u64)?, |bp| {
                 let boff = off % BSIZE;
                 let m = cmp::min(n - total, BSIZE - boff);
-                unsafe {
-                    volatile_copy_memory(
-                        bp.data_mut().as_mut_ptr().add(total + boff),
-                        src.as_ptr().add(total),
-                        m,
-                    );
-                }
+                let dst = &mut bp.data_mut()[boff..boff + m];
+                let src = &src[total..total + m];
+                volatile::copy_slice(dst, src);
                 fslog::write(bp);
                 off += m;
                 total += m;
@@ -654,12 +648,8 @@ impl Inode {
         assert_eq!(self.typ(), FileType::Dir, "dir_lookup not in a directory");
         for off in (0..self.size()).step_by(DIRENT_SIZE) {
             let mut entry = Dirent::default();
-            let mut bs = [0u8; DIRENT_SIZE];
-            let nread = self.readi(&mut bs, off)?;
+            let nread = self.readi(slice::from_mut(&mut entry), off)?;
             assert_eq!(nread, DIRENT_SIZE, "dir_lookup read");
-            unsafe {
-                volatile_copy_memory(&mut entry as *mut _ as *mut u8, bs.as_ptr(), DIRENT_SIZE);
-            }
             if entry.inum == 0 {
                 continue;
             }
@@ -697,10 +687,8 @@ impl Inode {
             }
         }
         let len = cmp::min(DIRSIZ, name.len());
-        unsafe {
-            volatile_set_memory(entry_slice.as_mut_ptr(), 0, DIRENT_SIZE);
-            volatile_copy_memory(entry.name.as_mut_ptr(), name.as_ptr(), len);
-        }
+        volatile::zero_slice(entry_slice);
+        volatile::copy_slice(&mut entry.name[..len], &name[..len]);
         entry.inum = inum;
         self.writei(entry_slice, off)?;
         Ok(())

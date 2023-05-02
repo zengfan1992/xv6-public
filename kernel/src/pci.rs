@@ -4,6 +4,7 @@ use crate::kmem;
 use crate::sd;
 use crate::trap;
 use crate::vm;
+use crate::volatile;
 use bitflags::bitflags;
 use core::ptr;
 
@@ -204,14 +205,14 @@ impl Conf {
 
 fn mapabar(kpage_table: &mut vm::PageTable, phys_addr: u64) -> Option<u32> {
     let addr = unsafe { kmem::phys_to_mut::<u32>(phys_addr) };
-    let bar = unsafe { ptr::read_volatile(addr) };
+    let bar = volatile::read(addr);
     if bar == 0 || bar & 0b1 == 1 {
         return None;
     }
-    let bits = unsafe {
-        ptr::write_volatile(addr, !0);
-        let bits = ptr::read_volatile(addr);
-        ptr::write_volatile(addr, bar);
+    let bits = {
+        volatile::write(addr, !0);
+        let bits = volatile::read(addr);
+        volatile::write(addr, bar);
         bits
     };
     let size = !(bits & !0xF) + 1;

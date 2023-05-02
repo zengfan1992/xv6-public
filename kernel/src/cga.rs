@@ -1,5 +1,5 @@
+use crate::volatile;
 use crate::x86_64::outb;
-use core::cmp::min;
 use core::ptr::NonNull;
 
 const BASE_ADDR: usize = 0xffff_8000_000b_8000;
@@ -15,30 +15,12 @@ pub struct Cga {
     buffer: NonNull<[u8; DISPLAY_SIZE]>,
 }
 
-fn bzero(buf: &mut [u8]) {
-    unsafe {
-        use core::intrinsics::volatile_set_memory;
-        volatile_set_memory(buf.as_mut_ptr(), 0, buf.len());
-    }
-}
-
-unsafe fn raw_bcopy(dst: *mut u8, src: &[u8], len: usize) {
-    use core::intrinsics::volatile_copy_memory;
-    unsafe {
-        volatile_copy_memory(dst, src.as_ptr(), len);
-    }
-}
-
-fn bcopy(dst: &mut [u8], src: &[u8]) {
-    let len = min(dst.len(), src.len());
-    unsafe {
-        raw_bcopy(dst.as_mut_ptr(), src, len);
-    }
-}
-
 fn bshift(dst: &mut [u8], offset: usize) {
+    let len = dst.len().checked_sub(offset).expect("offset");
+    let dp = dst[..len].as_mut_ptr();
+    let sp = dst[offset..offset + len].as_ptr();
     unsafe {
-        raw_bcopy(dst.as_mut_ptr(), &dst[offset..], dst.len() - offset);
+        core::intrinsics::volatile_copy_memory(dp, sp, len);
     }
 }
 
@@ -58,14 +40,14 @@ impl Cga {
     pub fn blank(&mut self) {
         self.line = 0;
         self.column = 0;
-        bzero(self.buffer_mut_slice());
+        volatile::zero_slice(self.buffer_mut_slice());
     }
 
     fn scroll(&mut self) {
         let len = DISPLAY_SIZE - DISPLAY_LINE_SIZE;
         let buffer = self.buffer_mut_slice();
         bshift(buffer, DISPLAY_LINE_SIZE);
-        bzero(&mut buffer[len..len + DISPLAY_LINE_SIZE]);
+        volatile::zero_slice(&mut buffer[len..len + DISPLAY_LINE_SIZE]);
         self.line -= 1;
         self.set_cursor();
     }
@@ -73,7 +55,7 @@ impl Cga {
     fn set_cursor(&mut self) {
         let off = self.line * DISPLAY_LINE_SIZE + self.column * 2;
         let buf = [b' ', 0x07u8];
-        bcopy(&mut self.buffer_mut_slice()[off..], &buf);
+        volatile::copy_slice(&mut self.buffer_mut_slice()[off..off + 2], &buf);
         let pos = self.line * DISPLAY_WIDTH + self.column;
         const INDEX_REG: u16 = 0x3d4;
         const DATA_REG: u16 = 0x3d5;
@@ -120,7 +102,7 @@ impl Cga {
             _ => {
                 let buf = [b, ATTRIBUTE];
                 let off = self.column * 2 + (self.line * DISPLAY_LINE_SIZE);
-                bcopy(&mut self.buffer_mut_slice()[off..], &buf);
+                volatile::copy_slice(&mut self.buffer_mut_slice()[off..off + 2], &buf);
                 self.column += 1;
                 if self.column >= DISPLAY_WIDTH {
                     self.putb(b'\n');

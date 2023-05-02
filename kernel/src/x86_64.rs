@@ -2,6 +2,7 @@ use crate::kmem;
 use crate::proc;
 use crate::spinlock::without_intrs;
 use crate::trap::trap;
+use crate::volatile;
 use crate::FromZeros;
 use bitflags::bitflags;
 use core::arch::asm;
@@ -30,15 +31,11 @@ impl Page {
     }
 
     pub fn clear(&mut self) {
-        unsafe {
-            core::intrinsics::volatile_set_memory(&mut self.0, 0u8, 1);
-        }
+        volatile::zero(&mut self.0);
     }
 
     pub fn scribble(&mut self) {
-        unsafe {
-            core::intrinsics::volatile_set_memory(self, 0b1010_1010u8, 1);
-        }
+        volatile::mem_set(&mut self.0, 0b1010_1010);
     }
 
     pub fn phys_addr(&self) -> u64 {

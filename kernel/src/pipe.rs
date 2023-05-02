@@ -3,6 +3,7 @@ use crate::file::{self, Like};
 use crate::kalloc;
 use crate::proc::{self, myproc};
 use crate::spinlock::SpinMutex as Mutex;
+use crate::volatile;
 use crate::Result;
 use core::mem;
 use core::ptr;
@@ -59,12 +60,12 @@ impl Pipe {
         (&self.nwrite as *const usize).addr()
     }
 
-    fn as_slice(&self) -> &[u8] {
+    fn data(&self) -> &[u8] {
         unsafe { self.data.as_ref().unwrap().as_slice() }
     }
 
-    fn as_mut_parts(&mut self) -> (*mut u8, usize) {
-        unsafe { self.data.as_mut().unwrap().as_mut_parts() }
+    fn data_mut(&mut self) -> &mut [u8] {
+        unsafe { self.data.as_mut().unwrap().as_mut() }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -77,15 +78,15 @@ impl Pipe {
 
     pub fn read_byte(&mut self) -> u8 {
         assert!(!self.is_empty());
-        let (ptr, len) = self.as_mut_parts();
-        let b = unsafe { ptr::read_volatile(ptr.add(self.nread % len)) };
+        let data = self.data();
+        let b = volatile::read(&data[self.nread % data.len()]);
         self.nread = self.nread.wrapping_add(1);
         b
     }
 
     pub fn is_full(&self) -> bool {
-        let buf = self.as_slice();
-        self.nread + buf.len() == self.nwrite
+        let data = self.data();
+        self.nread + data.len() == self.nwrite
     }
 
     pub fn broken(&self) -> bool {
@@ -94,11 +95,8 @@ impl Pipe {
 
     pub fn write_byte(&mut self, b: u8) {
         assert!(!self.is_full());
-        let nwrite = self.nwrite;
-        let (ptr, len) = self.as_mut_parts();
-        unsafe {
-            ptr::write_volatile(ptr.add(nwrite % len), b);
-        }
+        let k = self.nwrite % self.data().len();
+        volatile::write(&mut self.data_mut()[k], b);
         self.nwrite = self.nwrite.wrapping_add(1);
     }
 }

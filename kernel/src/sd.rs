@@ -9,6 +9,7 @@ use crate::kalloc;
 use crate::kmem;
 use crate::pci;
 use crate::spinlock::SpinMutex as Mutex;
+use crate::volatile;
 use crate::xapic;
 use bitflags::bitflags;
 use core::convert::TryFrom;
@@ -16,32 +17,6 @@ use core::convert::TryInto;
 use core::mem;
 use core::time::Duration;
 use static_assertions::const_assert_eq;
-
-// Private helper functions.
-mod volatile {
-    use core::ops::{BitAnd, BitOr, Not};
-    use core::ptr;
-
-    pub fn write<T>(r: &mut T, v: T) {
-        unsafe {
-            ptr::write_volatile(r, v);
-        }
-    }
-
-    pub fn read<T: BitOr<Output = T> + BitAnd<Output = T> + Not<Output = T>>(r: &T) -> T {
-        unsafe { ptr::read_volatile(r) }
-    }
-
-    pub fn set<T: BitOr<Output = T> + BitAnd<Output = T> + Not<Output = T>>(r: &mut T, v: T) {
-        let tmp = read(r);
-        write(r, tmp | v);
-    }
-
-    pub fn clear<T: BitAnd<Output = T> + BitOr<Output = T> + Not<Output = T>>(r: &mut T, v: T) {
-        let tmp = read(r);
-        write(r, tmp & !v);
-    }
-}
 
 mod fis {
     /// Frame Information Structure types.
@@ -284,15 +259,15 @@ impl Port {
     }
 
     fn start(&mut self) {
-        volatile::set(&mut self.cmd_status, Self::PORT_CMD_FRE);
-        volatile::set(&mut self.cmd_status, Self::PORT_CMD_ST);
+        volatile::bit::set(&mut self.cmd_status, Self::PORT_CMD_FRE);
+        volatile::bit::set(&mut self.cmd_status, Self::PORT_CMD_ST);
     }
 
     fn stop(&mut self) {
         if self.is_idle() {
             return;
         }
-        volatile::clear(&mut self.cmd_status, Self::PORT_CMD_ST | Self::PORT_CMD_FRE);
+        volatile::bit::clear(&mut self.cmd_status, Self::PORT_CMD_ST | Self::PORT_CMD_FRE);
         for _ in 0..500 {
             if self.is_idle() {
                 return;
@@ -306,7 +281,7 @@ impl Port {
     }
 
     fn issue(&mut self) {
-        volatile::set(&mut self.cmd_issue, 1);
+        volatile::bit::set(&mut self.cmd_issue, 1);
     }
 
     fn wait(&mut self) {

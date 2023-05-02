@@ -9,13 +9,13 @@ use crate::param::{USEREND, USERSTACK};
 use crate::spinlock::{without_intrs, SpinMutex as Mutex};
 use crate::syscall;
 use crate::vm;
+use crate::volatile;
 use crate::Result;
 use core::cell::{Cell, RefCell};
 use core::cmp;
 use core::fmt;
-use core::intrinsics::volatile_copy_memory;
 use core::mem::size_of;
-use core::ptr::{self, null_mut, write_volatile};
+use core::ptr::{self, null_mut};
 use core::slice;
 use core::sync::atomic::AtomicBool;
 
@@ -52,13 +52,8 @@ pub unsafe fn init(kpgtbl: &vm::PageTable) {
 
 fn make_init_user_page(init_code: &[u8]) -> &'static mut arch::Page {
     let page = kalloc::alloc().expect("init user alloc failed");
-    unsafe {
-        volatile_copy_memory(
-            page.as_mut().as_mut_ptr(),
-            init_code.as_ptr(),
-            init_code.len(),
-        );
-    }
+    let len = init_code.len();
+    volatile::copy_slice(&mut page.as_mut()[..len], init_code);
     page
 }
 
@@ -107,9 +102,7 @@ impl PerProc {
 
     pub fn set_name(&mut self, name: &[u8]) {
         let len = cmp::min(name.len(), self.name.len());
-        unsafe {
-            volatile_copy_memory(self.name.as_mut_ptr(), name.as_ptr(), len);
-        }
+        volatile::copy_slice(&mut self.name[..len], &name[..len]);
     }
 
     pub fn context_ptr(&self) -> *const arch::Context {
@@ -224,13 +217,13 @@ impl Proc {
 
     pub unsafe fn user_context(&self) -> &arch::TrapFrame {
         let raw = self.user_context_addr();
-        unsafe { &*(raw as *const arch::TrapFrame) }
+        unsafe { (raw as *const arch::TrapFrame).as_ref() }.unwrap()
     }
 
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn user_context_mut(&self) -> &mut arch::TrapFrame {
         let raw = self.user_context_addr();
-        unsafe { &mut *(raw as *mut arch::TrapFrame) }
+        unsafe { (raw as *mut arch::TrapFrame).as_mut() }.unwrap()
     }
 
     #[allow(clippy::mut_from_ref)]
@@ -300,7 +293,7 @@ impl Proc {
             unsafe {
                 let ctx = self.user_context();
                 let nctx = np.user_context_mut();
-                write_volatile(nctx, *ctx);
+                volatile::copy(nctx, ctx);
                 np.context_mut().set_return(forkret);
             }
             np.set_parent(self.as_chan());
@@ -610,9 +603,9 @@ where
             // Arrange for the scheduler to return to `syscallret`
             // and allocate space for the kernel scheduler context.
             let sp = sp.sub(1);
-            write_volatile(sp, syscall::syscallret as usize);
+            volatile::write(sp.as_mut().unwrap(), syscall::syscallret as usize);
             let sp = sp.sub(size_of::<arch::Context>() / size_of::<usize>());
-            let ctx = &mut *(sp as *mut arch::Context);
+            let ctx = (sp as *mut arch::Context).as_mut().unwrap();
             ctx.set_stack(sp.addr() as u64);
             ctx as *mut arch::Context
         };

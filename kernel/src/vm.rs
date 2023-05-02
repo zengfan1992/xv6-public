@@ -3,12 +3,13 @@ use crate::arch::Page;
 use crate::kalloc;
 use crate::kmem;
 use crate::param;
+use crate::volatile;
 use crate::Result;
 use bitflags::bitflags;
 use core::cmp;
 use core::fmt;
 use core::marker::PhantomData;
-use core::ptr::{null_mut, write_volatile};
+use core::ptr::null_mut;
 
 bitflags! {
     #[derive(Clone, Copy, Debug)]
@@ -171,9 +172,7 @@ where
             page.clear();
             let flags = PageFlags::PRESENT | PageFlags::USER | PageFlags::WRITE;
             entry = Entry::new(page.phys_addr(), flags);
-            unsafe {
-                write_volatile(&mut self.entries[index], entry);
-            }
+            volatile::write(&mut self.entries[index], entry);
         }
         let raw_ptr = entry.virt_page_addr();
         Some(unsafe { &mut *(raw_ptr as *mut Table<L::EntryType>) })
@@ -306,9 +305,7 @@ impl PageTable {
         {
             let mut new_entry = Entry::new(pa, flags);
             new_entry.enable();
-            unsafe {
-                write_volatile(entry, new_entry);
-            }
+            volatile::write(entry, new_entry);
             return Ok(());
         }
         Err("Allocation failed")

@@ -16,8 +16,9 @@
 
 use crate::acpi;
 use crate::param;
+use crate::volatile;
 use bitflags::bitflags;
-use core::ptr::{null_mut, read_volatile, write_volatile};
+use core::ptr::null_mut;
 
 #[repr(C)]
 struct IOAPIC {
@@ -70,30 +71,24 @@ pub unsafe fn enable(irq: u32, cpu: u32) {
 
 unsafe fn read(index: IOAPICRegs) -> u32 {
     assert_ne!(IOAPIC, null_mut());
-    unsafe {
-        let ioapic = &mut *IOAPIC;
-        write_volatile(&mut ioapic.reg, index as u32);
-        read_volatile(&ioapic.value)
-    }
+    let ioapic = unsafe { &mut *IOAPIC };
+    volatile::write(&mut ioapic.reg, index as u32);
+    volatile::read(&ioapic.value)
 }
 
 unsafe fn _write(index: IOAPICRegs, value: u32) {
     assert_ne!(IOAPIC, null_mut());
     let ioapic = unsafe { &mut *IOAPIC };
-    unsafe {
-        write_volatile(&mut ioapic.reg, index as u32);
-        write_volatile(&mut ioapic.value, value);
-    }
+    volatile::write(&mut ioapic.reg, index as u32);
+    volatile::write(&mut ioapic.value, value);
 }
 
 unsafe fn write_table(offset: u32, flags: IntrFlags, irq: u32, cpu: u32) {
     assert_ne!(IOAPIC, null_mut());
     let ioapic = unsafe { &mut *IOAPIC };
     let index = IOAPICRegs::TABLE as u32;
-    unsafe {
-        write_volatile(&mut ioapic.reg, index + offset * 2);
-        write_volatile(&mut ioapic.value, flags.bits() | irq);
-        write_volatile(&mut ioapic.reg, index + offset * 2 + 1);
-        write_volatile(&mut ioapic.value, cpu << 24);
-    }
+    volatile::write(&mut ioapic.reg, index + offset * 2);
+    volatile::write(&mut ioapic.value, flags.bits() | irq);
+    volatile::write(&mut ioapic.reg, index + offset * 2 + 1);
+    volatile::write(&mut ioapic.value, cpu << 24);
 }

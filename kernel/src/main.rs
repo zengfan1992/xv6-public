@@ -4,6 +4,7 @@
 #![feature(inline_const)]
 #![feature(naked_functions)]
 #![feature(proc_macro_hygiene)]
+#![feature(ptr_from_ref)]
 #![feature(strict_provenance)]
 #![cfg_attr(test, allow(dead_code))]
 #![cfg_attr(not(any(test, feature = "cargo-clippy")), no_std)]
@@ -37,6 +38,7 @@ mod sysfile;
 mod trap;
 mod uart;
 mod vm;
+mod volatile;
 mod x86_64;
 mod xapic;
 

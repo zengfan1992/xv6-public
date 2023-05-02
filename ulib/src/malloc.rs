@@ -142,7 +142,7 @@ fn inner_free(free_list: &mut Option<*mut Header>, tag: &mut Header) -> *mut Hea
             } else {
                 tag.next = np;
             }
-            let mut current = unsafe { p.as_mut().unwrap() };
+            let current = unsafe { p.as_mut().unwrap() };
             if current.end() == tp {
                 current.nunits += tag.nunits;
                 current.next = tag.next;

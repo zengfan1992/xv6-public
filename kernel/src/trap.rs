@@ -4,9 +4,9 @@ use crate::proc::{self, Proc};
 use crate::sd;
 use crate::spinlock::SpinMutex as Mutex;
 use crate::uart;
+use crate::volatile;
 use crate::xapic;
 use crate::Result;
-use core::ptr;
 
 pub(crate) const INTR0: u32 = 32;
 const KBD_INTR: u32 = INTR0 + kbd::INTR;
@@ -29,7 +29,7 @@ pub fn tickchan() -> usize {
 pub fn ticksleep(proc: &Proc, nticks: u64) -> Result<()> {
     let ticks0 = ticks();
     TICKS.with_lock(|ticks| {
-        while unsafe { ptr::read_volatile(ticks) } - ticks0 < nticks {
+        while volatile::read(ticks) - ticks0 < nticks {
             if proc.dead() {
                 return Err("killed");
             }
