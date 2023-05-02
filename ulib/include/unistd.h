@@ -13,6 +13,7 @@ ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 int pipe(int fds[2]);
 void *sbrk(intptr_t delta);
+unsigned int sleep(unsigned int s);
 
 static inline int
 execvp(const char *argv0, char *argv[])

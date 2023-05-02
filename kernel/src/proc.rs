@@ -410,7 +410,7 @@ impl Proc {
             if p.parent() == self.as_chan() {
                 p.set_parent(init_chan());
                 if p.state() == ProcState::ZOMBIE {
-                    wakeup1(&procs[..], p.as_chan());
+                    wakeup1(&procs[..], init_chan());
                 }
             }
         }
