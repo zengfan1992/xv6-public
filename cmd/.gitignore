@@ -1,7 +1,12 @@
 *.o
 _*
+cat
+echo
+grep
 init
+ls
+mkdir
+rm
 sh
 stressfs
-ls
-cat
+wc

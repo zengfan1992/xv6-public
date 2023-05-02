@@ -541,32 +541,34 @@ impl Inode {
 
     fn trunc(&self) -> Result<()> {
         assert!(self.lock.holding(), "truncating unlocked inode");
-        let mut dinode = self.dinode.borrow_mut();
-        let sb = &self
-            .meta
-            .borrow()
-            .sb
-            .expect("allocated inode sans superblock ref");
-        for addr in dinode
-            .addrs
-            .iter_mut()
-            .take(NDIRECT)
-            .filter(|addr| **addr != 0)
         {
-            bfree(self.dev(), *addr, sb);
-            *addr = 0;
+            let mut dinode = self.dinode.borrow_mut();
+            let sb = &self
+                .meta
+                .borrow()
+                .sb
+                .expect("allocated inode sans superblock ref");
+            for addr in dinode
+                .addrs
+                .iter_mut()
+                .take(NDIRECT)
+                .filter(|addr| **addr != 0)
+            {
+                bfree(self.dev(), *addr, sb);
+                *addr = 0;
+            }
+            if dinode.addrs[NDIRECT] != 0 {
+                bio::with_block(self.dev(), dinode.addrs[NDIRECT], |bp| {
+                    let addrs = unsafe { &mut *(bp.data() as *mut [u64; NINDIRECT]) };
+                    for addr in addrs.iter_mut().filter(|addr| **addr != 0) {
+                        bfree(self.dev(), *addr, sb);
+                        *addr = 0;
+                    }
+                })?;
+                bfree(self.dev(), dinode.addrs[NDIRECT], sb);
+            }
+            dinode.size = 0;
         }
-        if dinode.addrs[NDIRECT] != 0 {
-            bio::with_block(self.dev(), dinode.addrs[NDIRECT], |bp| {
-                let addrs = unsafe { &mut *(bp.data() as *mut [u64; NINDIRECT]) };
-                for addr in addrs.iter_mut().filter(|addr| **addr != 0) {
-                    bfree(self.dev(), *addr, sb);
-                    *addr = 0;
-                }
-            })?;
-            bfree(self.dev(), dinode.addrs[NDIRECT], sb);
-        }
-        dinode.size = 0;
         self.update()
     }
 
@@ -669,23 +671,25 @@ impl Inode {
 
     pub fn dir_link(&self, name: &[u8], inum: u64) -> Result<()> {
         if let Ok(ip) = self.dir_lookup(name) {
+            crate::println!("dir link already exists");
             ip.put()?;
             return Err("file already exists");
         }
-        let mut off = 0;
         let mut entry = Dirent::default();
         let entry_slice = {
             let ptr = &mut entry as *mut Dirent as *mut u8;
             unsafe { slice::from_raw_parts_mut(ptr, DIRENT_SIZE) }
         };
+        let mut off = None;
         for o in (0..self.size()).step_by(DIRENT_SIZE) {
-            off = o;
-            let nread = self.readi(entry_slice, off)?;
+            let nread = self.readi(entry_slice, o)?;
             assert_eq!(nread, DIRENT_SIZE, "dir_lookup read");
             if entry.inum == 0 {
+                off = Some(o);
                 break;
             }
         }
+        let off = off.unwrap_or(self.size());
         let len = cmp::min(DIRSIZ, name.len());
         volatile::zero_slice(entry_slice);
         volatile::copy_slice(&mut entry.name[..len], &name[..len]);
@@ -698,7 +702,7 @@ impl Inode {
         let guard = PutLockGuard::new(self);
         let (ip, offset) = self.dir_lookup_offset(name)?;
         ip.with_putlock(|ip| {
-            assert!(ip.nlink() < 1, "unlink inode < 1 links");
+            assert!(ip.nlink() > 0, "unlink inode < 1 links");
             if !ip.is_unlinkable()? {
                 return Err("not linkable");
             }
@@ -711,7 +715,6 @@ impl Inode {
             }
             guard.release();
             self.unlock_put()?;
-
             ip.nlink_dec();
             ip.update()
         })

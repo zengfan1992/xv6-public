@@ -5,6 +5,16 @@ clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-bui
 ld.lld -N -Ttext 0x1000 -e main -o cat cat.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
 clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o ls.o ls.c
 ld.lld -N -Ttext 0x1000 -e main -o ls ls.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o echo.o echo.c
+ld.lld -N -Ttext 0x1000 -e main -o echo echo.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o rm.o rm.c
+ld.lld -N -Ttext 0x1000 -e main -o rm rm.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o mkdir.o mkdir.c
+ld.lld -N -Ttext 0x1000 -e main -o mkdir mkdir.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o wc.o wc.c
+ld.lld -N -Ttext 0x1000 -e main -o wc wc.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o grep.o grep.c
+ld.lld -N -Ttext 0x1000 -e main -o grep grep.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
 clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -fno-stack-protector -nostdinc -nostdlib -c -o sh.o -c sh.c #minish.c
 clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -fno-stack-protector -nostdinc -nostdlib -c -o stressfs.o stressfs.c
 ld.lld -nostdlib -N -Ttext 0x1000 -e main -o sh sh.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
@@ -14,4 +24,9 @@ cp sh _sh && strip _sh
 cp stressfs _stressfs && strip _stressfs
 cp ls _ls && strip _ls
 cp cat _cat && strip _cat
-../bin/mkfs ../sdahci0.img _init _sh _stressfs _ls _cat
+cp echo _echo && strip _echo
+cp rm _rm && strip _rm
+cp mkdir _mkdir && strip _mkdir
+cp wc _wc && strip _wc
+cp grep _grep && strip _grep
+../bin/mkfs ../sdahci0.img _init _sh _stressfs _ls _cat _echo _rm _mkdir

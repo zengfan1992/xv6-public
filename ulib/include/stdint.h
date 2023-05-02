@@ -1,4 +1,5 @@
-#pragma once
+#ifndef STDINT_H__
+#define STDINT_H__
 
 typedef signed char int8_t;
 typedef short int16_t;
@@ -11,3 +12,5 @@ typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 
 typedef long long intptr_t;
+
+#endif // STDINT_H__
