@@ -275,7 +275,7 @@ pub fn ialloc(dev: u32, typ: FileType, sb: &'static Superblock) -> Result<&'stat
         let bp = bio::read(dev, sb.iblock(inum))?;
         let di = unsafe { buf_to_dinode(bp, inum as usize) };
         if di.typ == 0 {
-            di.typ = typ as u32;
+            volatile::write(&mut di.typ, typ as u32);
             fslog::write(bp);
             bp.relse();
             return Inode::get(dev, inum, sb);
@@ -670,31 +670,28 @@ impl Inode {
     }
 
     pub fn dir_link(&self, name: &[u8], inum: u64) -> Result<()> {
+        const INUM_SIZE: usize = mem::size_of::<u64>();
         if let Ok(ip) = self.dir_lookup(name) {
-            crate::println!("dir link already exists");
             ip.put()?;
             return Err("file already exists");
         }
-        let mut entry = Dirent::default();
-        let entry_slice = {
-            let ptr = &mut entry as *mut Dirent as *mut u8;
-            unsafe { slice::from_raw_parts_mut(ptr, DIRENT_SIZE) }
-        };
+        let mut buf = [0u8; mem::size_of::<Dirent>()];
         let mut off = None;
         for o in (0..self.size()).step_by(DIRENT_SIZE) {
-            let nread = self.readi(entry_slice, o)?;
+            let nread = self.readi(&mut buf[..], o)?;
             assert_eq!(nread, DIRENT_SIZE, "dir_lookup read");
-            if entry.inum == 0 {
+            let ino = u64::from_le_bytes(buf[0..INUM_SIZE].try_into().unwrap());
+            if ino == 0 {
                 off = Some(o);
                 break;
             }
         }
         let off = off.unwrap_or(self.size());
         let len = cmp::min(DIRSIZ, name.len());
-        volatile::zero_slice(entry_slice);
-        volatile::copy_slice(&mut entry.name[..len], &name[..len]);
-        entry.inum = inum;
-        self.writei(entry_slice, off)?;
+        volatile::zero_slice(&mut buf[..]);
+        volatile::copy_slice(&mut buf[..INUM_SIZE], &inum.to_le_bytes());
+        volatile::copy_slice(&mut buf[INUM_SIZE..INUM_SIZE + len], &name[..len]);
+        self.writei(&buf, off)?;
         Ok(())
     }
 

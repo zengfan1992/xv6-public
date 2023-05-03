@@ -7,6 +7,7 @@ pub enum FileType {
     Dev = 3,
 }
 
+#[repr(C)]
 pub struct Stat {
     pub typ: FileType,
     pub dev: u32,

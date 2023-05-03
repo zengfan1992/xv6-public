@@ -1,4 +1,5 @@
 use crate::arch;
+use crate::println;
 use crate::proc::{self, myproc};
 use crate::sysfile;
 use crate::trap;
@@ -50,7 +51,7 @@ extern "C" fn syscall(a0: usize, a1: usize, a2: usize, num: usize) -> i64 {
         MKDIR => sysfile::mkdir(proc, a0).map_or(-1, |_| 0),
         CLOSE => sysfile::close(proc, a0).map_or(-1, |_| 0),
         _ => {
-            crate::println!("syscall number {num}, a0={a0}, a1={a1}, a2={a2}");
+            println!("syscall number {num}, a0={a0}, a1={a1}, a2={a2}");
             -1
         }
     };

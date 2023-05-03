@@ -49,7 +49,7 @@ ls(char *path)
   Dirent de;
   Stat st;
 
-  if((fd = open(path, 0)) < 0){
+  if((fd = open(path, O_RDONLY)) < 0){
     dprintf(2, "ls: cannot open %s\n", path);
     return;
   }

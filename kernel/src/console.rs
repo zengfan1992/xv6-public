@@ -188,7 +188,7 @@ impl Reader {
                     return Err("console overflow");
                 }
                 let b = if b == b'\r' { b'\n' } else { b };
-                self.buffer[self.edit_index] = b;
+                self.buffer[self.edit_index % CAPACITY] = b;
                 self.edit_index = self.edit_index.wrapping_add(1);
                 WRITER.lock().putb(b);
                 if b == b'\n'
