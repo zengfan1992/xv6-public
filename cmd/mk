@@ -1,6 +1,8 @@
 #!/bin/sh
 clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o init.o init.c
 ld.lld -N -Ttext 0x1000 -e main -o init init.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o kill.o kill.c
+ld.lld -N -Ttext 0x1000 -e main -o kill kill.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
 clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o cat.o cat.c
 ld.lld -N -Ttext 0x1000 -e main -o cat cat.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
 clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o ls.o ls.c
@@ -17,11 +19,14 @@ clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-bui
 ld.lld -N -Ttext 0x1000 -e main -o grep grep.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
 clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o zombie.o zombie.c
 ld.lld -N -Ttext 0x1000 -e main -o zombie zombie.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
+clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -nostdinc -nostdlib -c -o forktest.o forktest.c
+ld.lld -N -Ttext 0x1000 -e main -o forktest forktest.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
 clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -fno-stack-protector -nostdinc -nostdlib -c -o sh.o -c sh.c #minish.c
 clang -g -I../ulib/include -target x86_64-none-unknown-elf -msoft-float -fno-builtin -fno-stack-protector -nostdinc -nostdlib -c -o stressfs.o stressfs.c
 ld.lld -nostdlib -N -Ttext 0x1000 -e main -o sh sh.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
 ld.lld -nostdlib -N -Ttext 0x1000 -e main -o stressfs stressfs.o ../target/x86_64-unknown-rxv64-elf/release/libulib.a
 cp init _init && strip _init
+cp kill _kill && strip _kill
 cp sh _sh && strip _sh
 cp stressfs _stressfs && strip _stressfs
 cp ls _ls && strip _ls
@@ -32,4 +37,5 @@ cp mkdir _mkdir && strip _mkdir
 cp wc _wc && strip _wc
 cp grep _grep && strip _grep
 cp zombie _zombie && strip _zombie
-../bin/mkfs ../sdahci0.img _init _sh _stressfs _ls _cat _echo _rm _mkdir _wc _grep _zombie
+cp forktest _forktest && strip _forktest
+../bin/mkfs ../sdahci0.img _init _kill _sh _stressfs _ls _cat _echo _rm _mkdir _wc _grep _zombie _forktest

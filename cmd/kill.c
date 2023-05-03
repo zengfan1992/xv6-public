@@ -1,17 +1,18 @@
-#include "types.h"
-#include "stat.h"
-#include "user.h"
+#include <signal.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int
-main(int argc, char **argv)
+main(int argc, char *argv[])
 {
   int i;
 
   if(argc < 2){
-    printf(2, "usage: kill pid...\n");
-    exit();
+    dprintf(2, "usage: kill pid...\n");
+    exit(1);
   }
   for(i=1; i<argc; i++)
-    kill(atoi(argv[i]));
-  exit();
+    kill(atoi(argv[i]), SIGTERM);
+  exit(0);
 }
