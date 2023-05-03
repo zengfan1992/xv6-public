@@ -539,36 +539,40 @@ impl Inode {
         Err("bmap: out of range")
     }
 
+    fn trunc1(&self) -> Result<()> {
+        let mut dinode = self.dinode.borrow_mut();
+        let sb = &self
+            .meta
+            .borrow()
+            .sb
+            .expect("allocated inode sans superblock ref");
+        for addr in dinode
+            .addrs
+            .iter_mut()
+            .take(NDIRECT)
+            .filter(|addr| **addr != 0)
+        {
+            bfree(self.dev(), *addr, sb);
+            *addr = 0;
+        }
+        if dinode.addrs[NDIRECT] != 0 {
+            bio::with_block(self.dev(), dinode.addrs[NDIRECT], |bp| {
+                let addrs = unsafe { &mut *(bp.data() as *mut [u64; NINDIRECT]) };
+                for addr in addrs.iter_mut().filter(|addr| **addr != 0) {
+                    bfree(self.dev(), *addr, sb);
+                    *addr = 0;
+                }
+            })?;
+            bfree(self.dev(), dinode.addrs[NDIRECT], sb);
+            dinode.addrs[NDIRECT] = 0;
+        }
+        dinode.size = 0;
+        Ok(())
+    }
+
     fn trunc(&self) -> Result<()> {
         assert!(self.lock.holding(), "truncating unlocked inode");
-        {
-            let mut dinode = self.dinode.borrow_mut();
-            let sb = &self
-                .meta
-                .borrow()
-                .sb
-                .expect("allocated inode sans superblock ref");
-            for addr in dinode
-                .addrs
-                .iter_mut()
-                .take(NDIRECT)
-                .filter(|addr| **addr != 0)
-            {
-                bfree(self.dev(), *addr, sb);
-                *addr = 0;
-            }
-            if dinode.addrs[NDIRECT] != 0 {
-                bio::with_block(self.dev(), dinode.addrs[NDIRECT], |bp| {
-                    let addrs = unsafe { &mut *(bp.data() as *mut [u64; NINDIRECT]) };
-                    for addr in addrs.iter_mut().filter(|addr| **addr != 0) {
-                        bfree(self.dev(), *addr, sb);
-                        *addr = 0;
-                    }
-                })?;
-                bfree(self.dev(), dinode.addrs[NDIRECT], sb);
-            }
-            dinode.size = 0;
-        }
+        self.trunc1()?;
         self.update()
     }
 

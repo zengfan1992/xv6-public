@@ -7,6 +7,7 @@ int getpid(void);
 int dup(int);
 int close(int);
 int fork(void);
+int link(const char *old, const char *new);
 int chdir(const char *path);
 int unlink(const char *path);
 ssize_t read(int fd, void *buf, size_t count);

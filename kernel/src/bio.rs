@@ -252,8 +252,8 @@ pub fn dequeue(head: Option<&Buf>) -> Option<(&Buf, Option<&Buf>)> {
 pub fn enqueue<'a>(head: Option<&'a Buf>, buf: &'a Buf) -> Option<&'a Buf> {
     buf.qnext.set(LIST_NONE);
     if let Some(head) = head {
-        let bi = buf.meta.borrow().self_ptr;
         BCACHE.with_lock(|cache| {
+            let bi = buf.meta.borrow().self_ptr;
             let mut head = head;
             while head.qnext() != LIST_NONE {
                 head = &cache.bufs[head.qnext()];

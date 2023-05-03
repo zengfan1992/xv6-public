@@ -2,11 +2,14 @@
 _*
 cat
 echo
+forktest
 grep
 init
+kill
 ls
 mkdir
 rm
 sh
 stressfs
 wc
+zombie
