@@ -40,8 +40,6 @@ impl BCache {
 // buffer cache lock.
 #[derive(Debug)]
 pub struct BufMeta {
-    dev: u32,
-    blockno: u64,
     ref_cnt: u32,
     self_ptr: usize,
     prev: usize,
@@ -51,8 +49,6 @@ pub struct BufMeta {
 impl BufMeta {
     pub const fn empty() -> BufMeta {
         BufMeta {
-            dev: 0,
-            blockno: 0,
             ref_cnt: 0,
             self_ptr: LIST_NONE,
             prev: LIST_NONE,
@@ -68,6 +64,8 @@ impl BufMeta {
 pub struct Buf {
     lock: Sleeplock,
     flags: Cell<BufFlags>,
+    dev: Cell<u32>,
+    blockno: Cell<u64>,
     meta: RefCell<BufMeta>,
     qnext: Cell<usize>,
     data: *mut arch::Page,
@@ -78,6 +76,8 @@ impl Buf {
         Buf {
             lock: Sleeplock::new("buffer"),
             flags: Cell::new(BufFlags::EMPTY),
+            dev: Cell::new(0),
+            blockno: Cell::new(0),
             meta: RefCell::new(BufMeta::empty()),
             qnext: Cell::new(LIST_NONE),
             data: null_mut(),
@@ -117,6 +117,21 @@ impl Buf {
         self.flags.set(flags);
     }
 
+    pub fn dev(&self) -> u32 {
+        self.dev.get()
+    }
+
+    pub fn set_dev(&self, dev: u32) {
+        self.dev.set(dev);
+    }
+    pub fn blockno(&self) -> u64 {
+        self.blockno.get()
+    }
+
+    pub fn set_blockno(&self, blockno: u64) {
+        self.blockno.set(blockno);
+    }
+
     pub fn is_locked(&self) -> bool {
         self.lock.holding()
     }
@@ -127,8 +142,21 @@ impl Buf {
         }
     }
 
-    pub fn blockno(&self) -> u64 {
-        self.meta.borrow().blockno
+    pub fn inc_ref(&self) {
+        assert!(BCACHE.holding());
+        self.meta.borrow_mut().ref_cnt += 1;
+    }
+
+    pub fn dec_ref(&self) -> u32 {
+        assert!(BCACHE.holding());
+        let mut meta = self.meta.borrow_mut();
+        meta.ref_cnt -= 1;
+        meta.ref_cnt
+    }
+
+    pub fn ref_cnt(&self) -> u32 {
+        assert!(BCACHE.holding());
+        self.meta.borrow().ref_cnt
     }
 
     pub fn qnext(&self) -> usize {
@@ -149,9 +177,8 @@ impl Buf {
         self.lock.release();
 
         BCACHE.with_lock(|cache| {
-            let mut meta = self.meta.borrow_mut();
-            meta.ref_cnt -= 1;
-            if meta.ref_cnt == 0 {
+            if self.dec_ref() == 0 {
+                let mut meta = self.meta.borrow_mut();
                 if cache.head != meta.self_ptr {
                     if cache.tail == meta.self_ptr {
                         cache.tail = meta.prev;
@@ -205,12 +232,11 @@ fn bget(dev: u32, blockno: u64) -> Result<&'static Buf> {
         let mut p = cache.head;
         while p != LIST_NONE {
             let b = &cache.bufs[p];
-            let mut meta = b.meta.borrow_mut();
-            if meta.dev == dev && meta.blockno == blockno {
-                meta.ref_cnt += 1;
+            if b.dev() == dev && b.blockno() == blockno {
+                b.inc_ref();
                 return Ok(unsafe { &*(b as *const Buf) });
             }
-            p = meta.next;
+            p = b.meta.borrow().next;
         }
         // Not in the cache, so recycle an unused buffer.
         // Even if ref_cnt is 0, DIRTY indicates a buffer is in use
@@ -218,15 +244,14 @@ fn bget(dev: u32, blockno: u64) -> Result<&'static Buf> {
         p = cache.tail;
         while p != LIST_NONE {
             let b = &cache.bufs[p];
-            let mut meta = b.meta.borrow_mut();
-            if meta.ref_cnt == 0 && !b.flags().contains(BufFlags::DIRTY) {
-                meta.dev = dev;
-                meta.blockno = blockno;
-                meta.ref_cnt = 1;
+            if b.ref_cnt() == 0 && !b.flags().contains(BufFlags::DIRTY) {
+                b.set_dev(dev);
+                b.set_blockno(blockno);
+                b.inc_ref();
                 b.set_flags(BufFlags::EMPTY);
                 return Ok(unsafe { &*(b as *const Buf) });
             }
-            p = meta.prev;
+            p = b.meta.borrow().prev;
         }
         Err("bget: no buffers")
     })?;

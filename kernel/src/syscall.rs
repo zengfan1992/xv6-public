@@ -47,7 +47,7 @@ extern "C" fn syscall(a0: usize, a1: usize, a2: usize, num: usize) -> i64 {
         WRITE => sysfile::write(proc, a0, a1, a2).map_or(-1, to_i64),
         MKNOD => sysfile::mknod(proc, a0, a1 as u32, a2 as u32).map_or(-1, |_| 0),
         UNLINK => sysfile::unlink(proc, a0).map_or(-1, |_| 0),
-        LINK => sysfile::link(proc, a0, a0).map_or(-1, |_| 0),
+        LINK => sysfile::link(proc, a0, a1).map_or(-1, |_| 0),
         MKDIR => sysfile::mkdir(proc, a0).map_or(-1, |_| 0),
         CLOSE => sysfile::close(proc, a0).map_or(-1, |_| 0),
         _ => {

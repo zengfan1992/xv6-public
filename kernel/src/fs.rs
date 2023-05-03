@@ -117,8 +117,8 @@ const BPB: usize = BSIZE * 8;
 // Directory is a file containing a sequence of dirent structures.
 pub const DIRSIZ: usize = 24;
 
-#[repr(C)]
 #[derive(Default, Debug)]
+#[repr(C)]
 pub struct Dirent {
     inum: u64,
     name: [u8; DIRSIZ],
@@ -275,6 +275,7 @@ pub fn ialloc(dev: u32, typ: FileType, sb: &'static Superblock) -> Result<&'stat
         let bp = bio::read(dev, sb.iblock(inum))?;
         let di = unsafe { buf_to_dinode(bp, inum as usize) };
         if di.typ == 0 {
+            volatile::zero(di);
             volatile::write(&mut di.typ, typ as u32);
             fslog::write(bp);
             bp.relse();
@@ -679,23 +680,23 @@ impl Inode {
             ip.put()?;
             return Err("file already exists");
         }
-        let mut buf = [0u8; mem::size_of::<Dirent>()];
-        let mut off = None;
-        for o in (0..self.size()).step_by(DIRENT_SIZE) {
-            let nread = self.readi(&mut buf[..], o)?;
+        let mut entry = [0u8; mem::size_of::<Dirent>()];
+        let mut off = 0;
+        while off < self.size() {
+            let nread = self.readi(&mut entry[..], off)?;
             assert_eq!(nread, DIRENT_SIZE, "dir_lookup read");
-            let ino = u64::from_le_bytes(buf[0..INUM_SIZE].try_into().unwrap());
+            let ino = u64::from_ne_bytes(entry[0..INUM_SIZE].try_into().unwrap());
             if ino == 0 {
-                off = Some(o);
                 break;
             }
+            off += entry.len() as u64;
         }
-        let off = off.unwrap_or(self.size());
         let len = cmp::min(DIRSIZ, name.len());
-        volatile::zero_slice(&mut buf[..]);
-        volatile::copy_slice(&mut buf[..INUM_SIZE], &inum.to_le_bytes());
-        volatile::copy_slice(&mut buf[INUM_SIZE..INUM_SIZE + len], &name[..len]);
-        self.writei(&buf, off)?;
+        volatile::zero_slice(&mut entry[..]);
+        volatile::copy_slice(&mut entry[..INUM_SIZE], &inum.to_ne_bytes());
+        volatile::copy_slice(&mut entry[INUM_SIZE..INUM_SIZE + len], &name[..len]);
+        let nwrite = self.writei(&entry, off)?;
+        assert_eq!(nwrite, DIRENT_SIZE);
         Ok(())
     }
 
@@ -828,43 +829,48 @@ fn is_dir(ip: &Inode) -> Result<&Inode> {
     Ok(ip)
 }
 
-pub fn namex<F>(mut path: &[u8], predicate: F) -> Result<&'static Inode>
-where
-    F: Fn(&'static Inode) -> Result<&'static Inode>,
-{
-    if path.is_empty() {
-        return Err("path empty");
-    }
-    let mut ip = if path[0] == b'/' {
+pub fn namex(mut path: &[u8]) -> Result<&'static Inode> {
+    let mut ip = if !path.is_empty() && path[0] == b'/' {
         let sb = unsafe { &SUPERBLOCK };
         Inode::get(param::ROOTDEV, ROOTINO, sb)?
     } else {
         proc::myproc().cwd().dup()
     };
     while let Some((name, rest)) = skip_elem(path) {
+        if name.is_empty() {
+            break;
+        }
         path = rest;
         ip = ip.with_putlock(|ip| {
             is_dir(ip)?;
-            predicate(ip.dir_lookup(name)?)
+            ip.dir_lookup(name)
         })?;
     }
     Ok(ip)
 }
 
 pub fn namei(path: &[u8]) -> Result<&'static Inode> {
-    namex(path, Ok)
+    if path.is_empty() {
+        return Err("path empty");
+    }
+    namex(path)
 }
 
 pub fn namei_parent(path: &[u8]) -> Result<(&'static Inode, &[u8])> {
     if path.is_empty() {
         return Err("empty path");
     }
-    let (path, file) = split_name(path);
-    let ip = if path.is_empty() {
-        proc::myproc().cwd().dup()
-    } else {
-        namex(path, is_dir)?
-    };
+    let (mut dir, file) = split_name(path);
+    if dir.is_empty() && path[0] == b'/' {
+        dir = b"/";
+    }
+    let ip = namex(dir)?;
+    ip.lock();
+    if ip.typ() != FileType::Dir {
+        let _ = ip.unlock_put();
+        return Err("not a dir");
+    }
+    ip.unlock();
     Ok((ip, file))
 }
 

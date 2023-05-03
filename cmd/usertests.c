@@ -1214,44 +1214,50 @@ bigfile(void)
 }
 
 void
-fourteen(void)
+twentyfour(void)
 {
   int fd;
 
-  // DIRSIZ is 14.
-  printf("fourteen test\n");
+  // DIRSIZ is 24.
+  printf("twentyfour test\n");
 
-  if(mkdir("12345678901234", 0755) != 0){
-    printf("mkdir 12345678901234 failed\n");
+  const char *T4 = "123456789012345678901234";
+  if(mkdir(T4, 0755) != 0){
+    printf("mkdir %s failed\n", T4);
     exit(1);
   }
-  if(mkdir("12345678901234/123456789012345", 0755) != 0){
-    printf("mkdir 12345678901234/123456789012345 failed\n");
+  const char *T4SD = "123456789012345678901234/123456789012345";
+  if(mkdir(T4SD, 0755) != 0){
+    printf("mkdir %s failed\n", T4SD);
     exit(1);
   }
-  fd = open("123456789012345/123456789012345/123456789012345", O_CREATE);
+  const char *T5SD = "1234567890123456789012345/123456789012345/123456789012345";
+  fd = open(T5SD, O_CREAT);
   if(fd < 0){
-    printf("create 123456789012345/123456789012345/123456789012345 failed\n");
+    printf("create %s failed\n", T5SD);
     exit(1);
   }
   close(fd);
-  fd = open("12345678901234/12345678901234/12345678901234", 0);
+  const char *T5SDF = "1234567890123456789012345/123456789012345/123456789012345";
+  fd = open(T5SDF, 0);
   if(fd < 0){
-    printf("open 12345678901234/12345678901234/12345678901234 failed\n");
+    printf("open %s failed\n", T5SDF);
     exit(1);
   }
   close(fd);
 
-  if(mkdir("12345678901234/12345678901234", 0755) == 0){
-    printf("mkdir 12345678901234/12345678901234 succeeded!\n");
+  const char *T4EXACT = "123456789012345678901234/123456789012345";
+  if(mkdir(T4EXACT, 0755) == 0){
+    printf("mkdir %s succeeded!\n", T4EXACT);
     exit(1);
   }
-  if(mkdir("123456789012345/12345678901234", 0755) == 0){
-    printf("mkdir 12345678901234/123456789012345 succeeded!\n");
+  const char *T5OVF = "1234567890123456789012345/123456789012345";
+  if(mkdir(T5OVF, 0755) == 0){
+    printf("mkdir %s succeeded!\n", T5OVF);
     exit(1);
   }
 
-  printf("fourteen ok\n");
+  printf("twentyfour ok\n");
 }
 
 void
@@ -1774,16 +1780,16 @@ main(int argc, char *argv[])
 
   argptest();
   createdelete();
-  //linkunlink();
-  //concreate();
+  linkunlink();
+  concreate();
   fourfiles();
-  //sharedfd();
+  sharedfd();
 
   //bigargtest();
   bigwrite();
   //bigargtest();
   bsstest();
-  //sbrktest();
+  sbrktest();
   validatetest();
 
   opentest();
@@ -1795,21 +1801,21 @@ main(int argc, char *argv[])
   exitiputtest();
   iputtest();
 
-  mem();
+  //mem();
   pipe1();
   preempt();
   exitwait();
 
   rmdot();
-  //fourteen();
+  twentyfour();
   bigfile();
-  //subdir();
-  //linktest();
+  subdir();
+  linktest();
   unlinkread();
   dirfile();
   iref();
   forktest();
-  //bigdir(); // slow
+  bigdir(); // slow
 
   uio();
 

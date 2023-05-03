@@ -27,6 +27,9 @@ bitflags! {
     }
 }
 
+const GIB: usize = 1 << 30;
+const MIB: usize = 1 << 20;
+
 #[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
 pub struct Entry(u64);
@@ -124,24 +127,6 @@ impl Level for Level2 {
     type EntryType = Level1;
 }
 
-// pub trait FreeUserPages: Level {
-//     fn free_user_pages(&mut self, start: usize, end: usize) {
-//         assert_eq!(start % arch::PAGE_SIZE, 0);
-//         assert_eq!(end % arch::PAGE_SIZE, 0);
-//         let si = Self::EntryType::index(start);
-//         let ei = Self::EntryType::index(end);
-//         for entry in self.entries[si..=ei].iter_mut().filter(|e| e.is_present()) {
-//             let raw_ptr = entry.virt_page_addr();
-//             let next_table = unsafe { &mut *(raw_ptr as *mut Table<Level2>) };
-//             next_table.free_user_pages(start, end);
-//             if next_table.is_empty() {
-//                 kalloc::free(unsafe { &mut *(raw_ptr as *mut arch::Page) });
-//                 entry.clear();
-//             }
-//         }
-//     }
-// }
-
 #[repr(C, align(4096))]
 pub struct Table<L>
 where
@@ -181,26 +166,21 @@ where
     fn is_empty(&self) -> bool {
         self.entries.iter().all(|entry| entry.is_zero())
     }
-
-    // fn free_user(&mut self) {
-    //     for entry in self.entries.iter_mut().take_while(|entry| !entry.is_zero()) {
-    //         let raw_ptr = entry.virt_page_addr();
-    //         let next_table = unsafe { &mut *(raw_ptr as *mut Table<L::EntryType>) };
-    //         next_table.free_user();
-    //         kalloc::free(unsafe { &mut *(raw_ptr as *mut arch::Page) });
-    //     }
-    // }
 }
 
 impl Table<Level3> {
     fn free_user_pages(&mut self, start: usize, end: usize) {
         assert_eq!(start % arch::PAGE_SIZE, 0);
         assert_eq!(end % arch::PAGE_SIZE, 0);
+        assert!(start < end);
+        assert!(end - start <= 512 * GIB);
         let si = Level3::index(start);
-        let ei = Level3::index(end);
-        for entry in self.entries[si..=ei].iter_mut().filter(|e| e.is_present()) {
+        let ei = si.max(Level3::index(end));
+        for (k, entry) in self.entries[si..=ei].iter_mut().enumerate().filter(|(_, e)| e.is_present()) {
             let raw_ptr = entry.virt_page_addr();
             let next_table = unsafe { &mut *(raw_ptr as *mut Table<Level2>) };
+            let start = cmp::max(start, k * GIB);
+            let end = cmp::min(end, (k + 1) * GIB);
             next_table.free_user_pages(start, end);
             if next_table.is_empty() {
                 kalloc::free(unsafe { &mut *(raw_ptr as *mut arch::Page) });
@@ -214,11 +194,15 @@ impl Table<Level2> {
     fn free_user_pages(&mut self, start: usize, end: usize) {
         assert_eq!(start % arch::PAGE_SIZE, 0);
         assert_eq!(end % arch::PAGE_SIZE, 0);
+        assert!(start < end, "{start}..{end}");
+        assert!(end - start <= GIB);
         let si = Level3::index(start);
-        let ei = Level3::index(end);
-        for entry in self.entries[si..=ei].iter_mut().filter(|e| e.is_present()) {
+        let ei = si.max(Level3::index(end));
+        for (k, entry) in self.entries[si..=ei].iter_mut().enumerate().filter(|(_, e)| e.is_present()) {
             let raw_ptr = entry.virt_page_addr();
             let next_table = unsafe { &mut *(raw_ptr as *mut Table<Level1>) };
+            let start = cmp::max(start, k * 2 * MIB);
+            let end = cmp::min(end, (k + 1) * 2 * MIB);
             next_table.free_user_pages(start, end);
             if next_table.is_empty() {
                 kalloc::free(unsafe { &mut *(raw_ptr as *mut arch::Page) });
@@ -249,8 +233,10 @@ impl Table<Level1> {
     fn free_user_pages(&mut self, start: usize, end: usize) {
         assert_eq!(start % arch::PAGE_SIZE, 0);
         assert_eq!(end % arch::PAGE_SIZE, 0);
+        assert!(start < end);
+        assert!(end - start <= 2 * MIB);
         let si = Level1::index(start);
-        let ei = Level1::index(end);
+        let ei = si.max(Level1::index(end));
         for entry in self.entries[si..=ei].iter_mut().filter(|e| e.is_present()) {
             let raw_ptr = entry.virt_page_addr();
             kalloc::free(unsafe { &mut *(raw_ptr as *mut arch::Page) });
@@ -370,7 +356,7 @@ impl PageTable {
         if new_size > param::USEREND {
             return Err("alloc_user: new size extends into kernel");
         }
-        if new_size < old_size {
+        if new_size <= old_size {
             return Ok(old_size);
         }
         let old_end = arch::page_round_up(old_size);
@@ -392,19 +378,24 @@ impl PageTable {
         if new_size >= old_size {
             return Ok(old_size);
         }
-        self.free_user_pages(new_size, arch::page_round_up(old_size));
+        self.free_user_pages(new_size, old_size);
         Ok(new_size)
     }
 
     pub fn free_user_pages(&mut self, start: usize, end: usize) {
         let start = arch::page_round_up(start);
-        let end = arch::page_round_down(end);
+        let end = arch::page_round_up(end);
+        if start >= end {
+            return;
+        }
         let si = Level4::index(start);
-        let ei = cmp::min(Level4::index(end), 255);
+        let ei = si.max(cmp::min(Level4::index(end), 256));
         let pgtbl = unsafe { self.0.as_mut().unwrap() };
-        for entry in pgtbl.entries[si..=ei].iter_mut().filter(|e| e.is_present()) {
+        for (k, entry) in pgtbl.entries[si..ei].iter_mut().enumerate().filter(|(_, e)| e.is_present()) {
             let raw_ptr = entry.virt_page_addr();
             let next_table = unsafe { &mut *(raw_ptr as *mut Table<Level3>) };
+            let start = cmp::max(start, k * 512 * GIB);
+            let end = cmp::min(end, (k + 1) * 512 * GIB);
             next_table.free_user_pages(start, end);
             if next_table.is_empty() {
                 kalloc::free(unsafe { &mut *(raw_ptr as *mut arch::Page) });
