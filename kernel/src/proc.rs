@@ -274,17 +274,13 @@ impl Proc {
         self.data.borrow_mut().pgtbl.replace(pgtbl)
     }
 
-    pub fn mark_unused(&self) {
-        PROCS.with_lock(|_| self.set_state(ProcState::UNUSED));
-    }
-
     pub fn fork(&self) -> Option<u32> {
         alloc(|np| -> Option<()> {
             {
                 let mut pd = np.data.borrow_mut();
                 let pgtbl = self.dup_pgtbl().or_else(|| {
                     kalloc::free(pd.kstack.take().unwrap());
-                    np.mark_unused();
+                    np.set_state(ProcState::UNUSED);
                     None
                 })?;
                 pd.pgtbl = Some(pgtbl);
@@ -488,10 +484,8 @@ impl Proc {
     }
 
     pub fn sched_yield(&self) {
-        PROCS.with_lock(|_| {
-            self.set_state(ProcState::RUNNABLE);
-            self.sched();
-        });
+        self.set_state(ProcState::RUNNABLE);
+        self.sched();
     }
 
     pub fn get_fd(&self, fd: usize) -> Option<&file::File> {
@@ -526,9 +520,11 @@ impl Proc {
 
 pub fn yield_if_running() {
     if let Some(proc) = try_myproc() {
-        if proc.state() == ProcState::RUNNING {
-            proc.sched_yield();
-        }
+        PROCS.with_lock(|_| {
+            if proc.state() == ProcState::RUNNING {
+                proc.sched_yield();
+            }
+        });
     }
 }
 

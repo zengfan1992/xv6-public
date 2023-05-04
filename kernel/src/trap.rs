@@ -1,5 +1,6 @@
 use crate::arch;
 use crate::kbd;
+use crate::println;
 use crate::proc::{self, Proc};
 use crate::sd;
 use crate::spinlock::SpinMutex as Mutex;
@@ -50,6 +51,7 @@ pub extern "C" fn trap(vecnum: u32, frame: &mut arch::TrapFrame) {
                     frame.error
                 );
             }
+            //println!("trap user pagefault");
             proc::myproc().kill();
         }
         KBD_INTR => {
@@ -77,10 +79,9 @@ pub extern "C" fn trap(vecnum: u32, frame: &mut arch::TrapFrame) {
         }
         _ => {
             if !frame.is_user() || proc::try_myproc().is_none() {
-                crate::println!(
-                    "unexpected trap on cpu {} frame: {:#x?}!",
-                    arch::mycpu_id(),
-                    frame
+                println!(
+                    "unexpected trap on cpu {cpu} frame: {frame:#x?}!",
+                    cpu = arch::mycpu_id(),
                 );
                 panic!("unanticipated interrupt");
             }

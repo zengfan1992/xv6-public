@@ -27,7 +27,8 @@ impl Spinlock {
 
     pub fn acquire(&mut self) {
         unsafe { CPU::push_intr_disable() };
-        assert!(!self.holding(), "nested lock: {}", self.name);
+        let cpu = i64::from(mycpu_id());
+        assert!(!self.holding(), "nested lock: {} on cpu {cpu}", self.name);
         while xswap(&mut self.locked, 1) != 0 {
             cpu_relax();
         }

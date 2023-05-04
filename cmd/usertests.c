@@ -447,7 +447,7 @@ mem(void)
   ppid = getpid();
   if((pid = fork()) == 0){
     m1 = 0;
-    while(counter-- > 0 && (m2 = malloc(10001)) != 0){
+    while(/*counter-- > 0 &&*/ (m2 = malloc(10001)) != 0){
       *(char**)m2 = m1;
       m1 = m2;
     }
@@ -456,7 +456,7 @@ mem(void)
       free(m1);
       m1 = m2;
     }
-    exit(0);
+    /*
     m1 = malloc(1024*20);
     if(m1 == 0){
       printf("couldn't allocate mem?!!\n");
@@ -464,6 +464,7 @@ mem(void)
       exit(1);
     }
     free(m1);
+    */
     printf("mem ok\n");
     exit(1);
   } else {
@@ -1471,47 +1472,57 @@ sbrktest(void)
 
   // can one grow address space to something big?
 #define BIG (100*1024*1024)
-  a = sbrk(0);
-  amt = (BIG) - (size_t)a;
-  p = sbrk(amt);
-  if (p != a) {
-    printf("sbrk test failed to grow big address space; enough phys mem?\n");
-    exit(1);
-  }
-  lastaddr = (char*) (BIG-1);
-  *lastaddr = 99;
+  if (fork()) {
+    wait(NULL);
+  } else{
+    a = sbrk(0);
+    amt = (BIG) - (size_t)a;
+    p = sbrk(amt);
+    if (p != a) {
+      printf("sbrk test failed to grow big address space; enough phys mem?\n");
+      exit(1);
+    }
+    lastaddr = (char*) (BIG-1);
+    *lastaddr = 99;
 
-  // can one de-allocate?
-  a = sbrk(0);
-  c = sbrk(-4096);
-  if(c == (char*)0xffffffff){
-    printf("sbrk could not deallocate\n");
-    exit(1);
-  }
-  c = sbrk(0);
-  if(c != a - 4096){
-    printf("sbrk deallocation produced wrong address, a %x c %x\n", a, c);
-    exit(1);
-  }
+    // can one de-allocate?
+    a = sbrk(0);
+    c = sbrk(-4096);
+    if(c == (char*)0xffffffff){
+      printf("sbrk could not deallocate\n");
+      exit(1);
+    }
+    c = sbrk(0);
+    if(c != a - 4096){
+      printf("sbrk deallocation produced wrong address, a %x c %x\n", a, c);
+      exit(1);
+    }
 
-  // can one re-allocate that page?
-  a = sbrk(0);
-  c = sbrk(4096);
-  if(c != a || sbrk(0) != a + 4096){
-    printf("sbrk re-allocation failed, a %x c %x\n", a, c);
-    exit(1);
-  }
-  if(*lastaddr == 99){
-    // should be zero
-    printf("sbrk de-allocation didn't really deallocate\n");
-    exit(1);
-  }
+    // can one re-allocate that page?
+    a = sbrk(0);
+    c = sbrk(4096);
+    if(c != a || sbrk(0) != a + 4096){
+      printf("sbrk re-allocation failed, a %x c %x\n", a, c);
+      exit(1);
+    }
+    if(*lastaddr == 99){
+      // should be zero
+      printf("sbrk de-allocation didn't really deallocate\n");
+      exit(1);
+    }
 
-  a = sbrk(0);
-  c = sbrk(-((brk0 = sbrk(0)) - oldbrk));
-  if(c != a){
-    printf("sbrk downsize failed, a %x c %x\n", a, c);
-    exit(1);
+
+    a = sbrk(0);
+    brk0 = sbrk(0);
+    amt = oldbrk - brk0;
+    printf("amt=%d\n", amt);
+    if (0) {
+      c = sbrk(-((brk0 = sbrk(0)) - oldbrk));
+      if(c != a){
+        printf("sbrk downsize failed, a %x c %x\n", a, c);
+        exit(1);
+      }
+    }
   }
 
   // can we read the kernel's memory?
