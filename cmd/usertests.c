@@ -441,12 +441,13 @@ mem(void)
 {
   void *m1, *m2;
   int pid, ppid;
+  int counter=10000;
 
   printf("mem test\n");
   ppid = getpid();
   if((pid = fork()) == 0){
     m1 = 0;
-    while((m2 = malloc(10001)) != 0){
+    while(counter-- > 0 && (m2 = malloc(10001)) != 0){
       *(char**)m2 = m1;
       m1 = m2;
     }
@@ -455,6 +456,7 @@ mem(void)
       free(m1);
       m1 = m2;
     }
+    exit(0);
     m1 = malloc(1024*20);
     if(m1 == 0){
       printf("couldn't allocate mem?!!\n");
@@ -1639,10 +1641,15 @@ bigargtest(void)
   unlink("bigarg-ok");
   pid = fork();
   if(pid == 0){
+    const char *msg = "bigargs test: failed\n";
+    static char bigbuf[2048];
     static char *args[MAXARG];
     int i;
+    memset(bigbuf, ' ', sizeof(bigbuf));
+    memcpy(bigbuf, msg, strlen(msg));
+    bigbuf[sizeof(bigbuf) - 1] = '\0';
     for(i = 0; i < MAXARG-1; i++)
-      args[i] = "bigargs test: failed\n                                                                                                                                                                                                       ";
+      args[i] = bigbuf;
     args[MAXARG-1] = 0;
     printf("bigarg test\n");
     execvp("echo", args);
@@ -1785,9 +1792,9 @@ main(int argc, char *argv[])
   fourfiles();
   sharedfd();
 
-  //bigargtest();
+  bigargtest();
   bigwrite();
-  //bigargtest();
+  bigargtest();
   bsstest();
   sbrktest();
   validatetest();
@@ -1801,7 +1808,7 @@ main(int argc, char *argv[])
   exitiputtest();
   iputtest();
 
-  //mem();
+  mem();
   pipe1();
   preempt();
   exitwait();

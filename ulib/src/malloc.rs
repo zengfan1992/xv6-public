@@ -63,6 +63,7 @@ fn inner_malloc(free_list: &mut Option<*mut Header>, n: usize) -> Option<&'stati
         let mut prevp = free_list.unwrap();
         let mut pp = unsafe { prevp.as_ref().unwrap().next };
         loop {
+            //if n == 1024*20 {}
             let pnunits = unsafe { pp.as_ref().unwrap().nunits };
             if pnunits >= nunits {
                 let mp = unsafe { pp.as_mut().unwrap() };
