@@ -455,7 +455,6 @@ mem(void)
       free(m1);
       m1 = m2;
     }
-    /*
     m1 = malloc(1024*20);
     if(m1 == 0){
       printf("couldn't allocate mem?!!\n");
@@ -463,7 +462,6 @@ mem(void)
       exit(1);
     }
     free(m1);
-    */
     printf("mem ok\n");
     exit(1);
   } else {
@@ -1442,7 +1440,6 @@ sbrktest(void)
 
   printf("sbrk test\n");
   oldbrk = sbrk(0);
-  printf("oldbrk = %x\n", oldbrk);
 
   // can one sbrk() less than a page?
   a = sbrk(0);

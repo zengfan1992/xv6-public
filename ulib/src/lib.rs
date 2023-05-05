@@ -1,7 +1,9 @@
 #![feature(asm_const)]
 #![feature(c_variadic)]
 #![feature(naked_functions)]
+#![feature(strict_provenance)]
 #![cfg_attr(not(any(test, feature = "cargo-clippy")), no_std)]
+#![forbid(unsafe_op_in_unsafe_fn)]
 
 use core::cmp;
 use core::ffi;
@@ -17,7 +19,7 @@ mod tests;
 /// # Safety
 /// The input string may not be NUL-terminated.
 unsafe fn cstr2slice<'a>(s: *const u8) -> &'a [u8] {
-    slice::from_raw_parts(s, strlen(s))
+    unsafe { slice::from_raw_parts(s, strlen(s)) }
 }
 
 /// # Safety
@@ -34,7 +36,9 @@ pub unsafe extern "C" fn strlcpy(dst: *mut u8, src: *const u8, size: usize) -> u
         dst[k] = b'\0';
         src.len()
     }
-    inner(slice::from_raw_parts_mut(dst, size), cstr2slice(src))
+    let dst = unsafe { slice::from_raw_parts_mut(dst, size) };
+    let src = unsafe { cstr2slice(src) };
+    inner(dst, src)
 }
 
 /// # Safety
@@ -42,7 +46,7 @@ pub unsafe extern "C" fn strlcpy(dst: *mut u8, src: *const u8, size: usize) -> u
 #[no_mangle]
 pub unsafe extern "C" fn strlen(s: *const u8) -> usize {
     let mut k = 0;
-    while *s.offset(k) != 0 {
+    while unsafe { *s.offset(k) } != 0 {
         k += 1;
     }
     k as usize
@@ -56,7 +60,7 @@ pub unsafe extern "C" fn strchr(s: *const u8, c: u8) -> *const u8 {
         let off = s.iter().position(|ch| *ch == c)?;
         Some(&s[off])
     }
-    match inner(cstr2slice(s), c) {
+    match unsafe { inner(cstr2slice(s), c) } {
         Some(p) => p as *const u8,
         None => ptr::null(),
     }
@@ -77,7 +81,7 @@ pub unsafe extern "C" fn strcmp(p: *const u8, q: *const u8) -> i32 {
         }
         0
     }
-    inner(cstr2slice(p), cstr2slice(q))
+    inner(unsafe { cstr2slice(p) }, unsafe { cstr2slice(q) })
 }
 
 /// # Safety
@@ -89,7 +93,7 @@ pub unsafe extern "C" fn atoi(s: *const u8) -> i32 {
             .take_while(|c| b'0' <= **c && **c <= b'9')
             .fold(0, |sum, c| sum * 10 + i32::from(*c - b'0'))
     }
-    inner(cstr2slice(s))
+    inner(unsafe { cstr2slice(s) })
 }
 
 /// # Safety
@@ -98,7 +102,7 @@ pub unsafe extern "C" fn atoi(s: *const u8) -> i32 {
 pub unsafe extern "C" fn memmove(dst: *mut u8, src: *const u8, len: usize) -> *mut u8 {
     //ptr::copy(src, dst, len);
     //dst
-    memcpy(dst, src, len)
+    unsafe { memcpy(dst, src, len) }
 }
 
 /// # Safety
@@ -148,7 +152,7 @@ pub unsafe extern "C" fn memset(dst: *mut u8, c: u8, n: usize) -> *mut u8 {
 /// C strings and variadic args.
 #[no_mangle]
 pub unsafe extern "C" fn rvdprintf(fd: i32, fmt: *const u8, ap: ffi::VaList) {
-    rvdprintf::rvdprintf(fd, cstr2slice(fmt), ap);
+    rvdprintf::rvdprintf(fd, unsafe { cstr2slice(fmt) }, ap);
 }
 
 /// # Safety
@@ -156,7 +160,7 @@ pub unsafe extern "C" fn rvdprintf(fd: i32, fmt: *const u8, ap: ffi::VaList) {
 #[cfg(not(any(test, feature = "cargo-clippy")))]
 #[no_mangle]
 pub unsafe extern "C" fn malloc(n: usize) -> *mut u8 {
-    malloc::krmalloc(n)
+    unsafe { malloc::krmalloc(n) }
 }
 
 /// # Safety
@@ -164,13 +168,15 @@ pub unsafe extern "C" fn malloc(n: usize) -> *mut u8 {
 #[cfg(not(any(test, feature = "cargo-clippy")))]
 #[no_mangle]
 pub unsafe extern "C" fn free(p: *mut u8) {
-    malloc::krfree(p);
+    unsafe {
+        malloc::krfree(p);
+    }
 }
 
 #[cfg(not(any(test, feature = "cargo-clippy")))]
 #[panic_handler]
 #[no_mangle]
-pub extern "C" fn panic(_: &core::panic::PanicInfo) -> ! {
+pub extern "C" fn panic(_info: &core::panic::PanicInfo) -> ! {
     #[allow(clippy::empty_loop)]
     loop {}
 }
