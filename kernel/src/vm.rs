@@ -174,7 +174,7 @@ impl Table<Level3> {
             assert_eq!(start % arch::PAGE_SIZE, 0);
             assert_eq!(end % arch::PAGE_SIZE, 0);
             assert!(end - start <= 512 * GIB);
-            let lstart = start & (GIB - 1);
+            let lstart = start & !(GIB - 1);
             for va in (lstart..end).step_by(GIB) {
                 let end = cmp::min(end, va + GIB);
                 let k = Level3::index(va);
@@ -200,7 +200,7 @@ impl Table<Level2> {
             assert_eq!(start % arch::PAGE_SIZE, 0);
             assert_eq!(end % arch::PAGE_SIZE, 0);
             assert!(end - start <= GIB, "{end:x} - {start:x} too big");
-            let lstart = start & (2 * MIB - 1);
+            let lstart = start & !(2 * MIB - 1);
             for va in (lstart..end).step_by(2 * MIB) {
                 let end = cmp::min(end, va + 2 * MIB);
                 let k = Level2::index(va);
@@ -399,7 +399,7 @@ impl PageTable {
             let start = arch::page_round_up(start);
             let end = arch::page_round_up(end);
             let pgtbl = unsafe { self.0.as_mut().unwrap() };
-            let lstart = start & (512 * GIB - 1);
+            let lstart = start & !(512 * GIB - 1);
             for va in (lstart..end).step_by(512 * GIB) {
                 let end = cmp::min(end, va + 512 * GIB);
                 let k = Level4::index(va);
