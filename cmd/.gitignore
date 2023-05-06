@@ -6,7 +6,9 @@ forktest
 grep
 init
 kill
+ln
 ls
+malloctest
 mkdir
 rm
 sh
