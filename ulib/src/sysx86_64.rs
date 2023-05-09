@@ -35,8 +35,8 @@ mod syscalls {
     use syslib::syscall as SYS;
 
     syscall!(fork, SYS::FORK, i32);
-    syscall!(exit, SYS::EXIT, i32);
-    syscall!(wait, SYS::WAIT, i32);
+    syscall!(exit, SYS::EXIT, i32, status: i32);
+    syscall!(wait, SYS::WAIT, i32, status: *mut i32);
     syscall!(pipe, SYS::PIPE, i32, fds: *mut i32);
     syscall!(write, SYS::WRITE, isize, fd: i32, buf: *const u8, n: usize);
     syscall!(read, SYS::READ, isize, fd: i32, buf: *mut u8, n: usize);

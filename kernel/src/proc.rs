@@ -79,7 +79,7 @@ pub enum ProcState {
     SLEEPING(usize),
     RUNNABLE,
     RUNNING,
-    ZOMBIE,
+    ZOMBIE(i32),
 }
 
 #[derive(Debug)]
@@ -390,7 +390,7 @@ impl Proc {
     // Exit the current process.  Does not return.
     // An exited process remains in the zombie state
     // until its parent calls wait() to find out it exited.
-    pub fn exit(&self) -> ! {
+    pub fn exit(&self, status: i32) -> ! {
         assert_ne!(self.as_chan(), init_chan(), "init exiting");
         // Close open files.
         for file in self.files.borrow_mut().iter_mut().filter(|f| f.is_some()) {
@@ -405,26 +405,32 @@ impl Proc {
         for p in procs.iter().filter(|&p| p.initialized()) {
             if p.parent() == self.as_chan() {
                 p.set_parent(init_chan());
-                if p.state() == ProcState::ZOMBIE {
+                if let ProcState::ZOMBIE(_) = p.state() {
                     wakeup1(&procs[..], init_chan());
                 }
             }
         }
-        self.set_state(ProcState::ZOMBIE);
+        self.set_state(ProcState::ZOMBIE(status));
         self.sched();
         core::unreachable!();
     }
 
     // Wait for a child process to exit and return its pid.
     // Return None if this process has no children.
-    pub fn wait(&self) -> Option<u32> {
-        let (pid, zkstack, zpgtbl) = self.wait1()?;
+    pub fn wait(&self, status_ptr: usize) -> Option<u32> {
+        let statusp = self.fetch_ptr_mut::<i32>(status_ptr, 1)?;
+        let (pid, status, zkstack, zpgtbl) = self.wait1()?;
         kalloc::free(zkstack); // XXX plock held?
         drop(zpgtbl); // XXX plock held?
+        if statusp != ptr::null_mut() {
+            unsafe {
+                ptr::write(statusp, status);
+            }
+        }
         Some(pid)
     }
 
-    fn wait1(&self) -> Option<(u32, &mut arch::Page, vm::PageTable)> {
+    fn wait1(&self) -> Option<(u32, i32, &mut arch::Page, vm::PageTable)> {
         let procs = PROCS.lock();
         loop {
             let mut have_kids = false;
@@ -433,7 +439,7 @@ impl Proc {
                     continue;
                 }
                 have_kids = true;
-                if p.state() == ProcState::ZOMBIE {
+                if let ProcState::ZOMBIE(status) = p.state() {
                     let zkstack;
                     let zpgtbl;
                     {
@@ -447,7 +453,7 @@ impl Proc {
                     p.resurrect();
                     p.set_size(0);
                     p.set_state(ProcState::UNUSED);
-                    return Some((pid, zkstack, zpgtbl));
+                    return Some((pid, status, zkstack, zpgtbl));
                 }
             }
             if !have_kids || self.dead() {
@@ -531,7 +537,7 @@ pub fn yield_if_running() {
 pub fn die_if_dead() {
     if let Some(proc) = try_myproc() {
         if proc.dead() {
-            proc.exit();
+            proc.exit(1);
         }
     }
 }

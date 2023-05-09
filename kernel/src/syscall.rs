@@ -30,8 +30,8 @@ extern "C" fn syscall(a0: usize, a1: usize, a2: usize, num: usize) -> i64 {
     let proc = myproc();
     let r = match num {
         FORK => proc.fork().map_or(-1, i64::from),
-        EXIT => proc.exit(),
-        WAIT => proc.wait().map_or(-1, i64::from),
+        EXIT => proc.exit(a0 as i32),
+        WAIT => proc.wait(a0).map_or(-1, i64::from),
         PIPE => sysfile::pipe(proc, a0).map_or(-1, |_| 0),
         READ => sysfile::read(proc, a0, a1, a2).map_or(-1, to_i64),
         KILL => proc::kill(a0 as u32).map_or(-1, |_| 0),
@@ -56,7 +56,7 @@ extern "C" fn syscall(a0: usize, a1: usize, a2: usize, num: usize) -> i64 {
         }
     };
     if proc.dead() {
-        proc.exit();
+        proc.exit(1);
     }
     r
 }
