@@ -1,10 +1,10 @@
 #![feature(asm_const)]
 #![feature(const_mut_refs)]
 #![feature(core_intrinsics)]
+#![feature(exposed_provenance)]
 #![feature(inline_const)]
 #![feature(naked_functions)]
 #![feature(proc_macro_hygiene)]
-#![feature(ptr_from_ref)]
 #![feature(strict_provenance)]
 #![cfg_attr(test, allow(dead_code))]
 #![cfg_attr(not(any(test, feature = "cargo-clippy")), no_std)]
@@ -150,7 +150,7 @@ mod runtime {
     static PANIC_SEQ: AtomicBool = AtomicBool::new(false);
 
     #[panic_handler]
-    pub extern "C" fn panic(info: &PanicInfo) -> ! {
+    pub fn panic(info: &PanicInfo) -> ! {
         use crate::panic_println;
         panic_println!("@");
         while PANIC_SEQ.swap(true, Ordering::AcqRel) {}

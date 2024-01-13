@@ -10,7 +10,7 @@ use core::fmt;
 use core::ptr;
 use core::time;
 use seq_macro::seq;
-use zerocopy::FromBytes;
+use zerocopy::{FromBytes, FromZeroes};
 
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 mod asm {
@@ -21,7 +21,7 @@ mod asm {
 
 pub const PAGE_SIZE: usize = 4096;
 #[repr(C, align(4096))]
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 pub struct Page([u8; PAGE_SIZE]);
 unsafe impl FromZeros for Page {}
 
@@ -95,7 +95,7 @@ mod page_round_tests {
 
 const SMALL_STACK_SIZE: usize = 512;
 #[repr(C, align(512))]
-#[derive(FromBytes)]
+#[derive(FromBytes, FromZeroes)]
 pub struct SmallStack([u8; SMALL_STACK_SIZE]);
 unsafe impl FromZeros for SmallStack {}
 
@@ -145,7 +145,7 @@ mod segment {
     use super::SmallStack;
     use core::arch::asm;
 
-    #[repr(transparent)]
+    #[repr(C)]
     pub struct Desc(u64);
 
     #[repr(C)]

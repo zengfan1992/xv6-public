@@ -79,14 +79,18 @@ pub unsafe fn init() {
 }
 
 unsafe fn read(index: XAPICRegs) -> u32 {
-    assert_ne!(XAPIC, null_mut());
-    let xapic = unsafe { &*XAPIC };
+    let xapic = unsafe {
+        assert_ne!(XAPIC, null_mut());
+        &*XAPIC
+    };
     volatile::read(&xapic[index as usize])
 }
 
 unsafe fn write(index: XAPICRegs, value: u32) {
-    assert_ne!(XAPIC, null_mut());
-    let xapic = unsafe { &mut *XAPIC };
+    let xapic = unsafe {
+        assert_ne!(XAPIC, null_mut());
+        &mut *XAPIC
+    };
     volatile::write(&mut xapic[index as usize], value);
     volatile::read(&xapic[XAPICRegs::ID as usize]);
 }
@@ -101,8 +105,8 @@ unsafe fn wait_delivery() {
 }
 
 pub unsafe fn eoi() {
-    assert_ne!(XAPIC, null_mut());
     unsafe {
+        assert_ne!(XAPIC, null_mut());
         write(XAPICRegs::EOI, 0);
     }
 }

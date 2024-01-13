@@ -1,5 +1,6 @@
 #![feature(asm_const)]
 #![feature(c_variadic)]
+#![feature(exposed_provenance)]
 #![feature(naked_functions)]
 #![feature(strict_provenance)]
 #![cfg_attr(not(any(test, feature = "cargo-clippy")), no_std)]
@@ -175,8 +176,7 @@ pub unsafe extern "C" fn free(p: *mut u8) {
 
 #[cfg(not(any(test, feature = "cargo-clippy")))]
 #[panic_handler]
-#[no_mangle]
-pub extern "C" fn panic(_info: &core::panic::PanicInfo) -> ! {
+pub fn panic(_info: &core::panic::PanicInfo) -> ! {
     #[allow(clippy::empty_loop)]
     loop {}
 }

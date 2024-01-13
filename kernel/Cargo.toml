@@ -9,4 +9,4 @@ bitflags = "*"
 seq-macro = "*"
 static_assertions = "*"
 syslib = { path = "../syslib" }
-zerocopy = "*"
+zerocopy = { version = "*", features = [ "derive" ] }
