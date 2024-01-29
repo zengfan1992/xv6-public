@@ -1,3 +1,5 @@
+#![allow(clippy::upper_case_acronyms)]
+#![allow(internal_features)]
 #![feature(asm_const)]
 #![feature(const_mut_refs)]
 #![feature(core_intrinsics)]
@@ -9,7 +11,6 @@
 #![cfg_attr(test, allow(dead_code))]
 #![cfg_attr(not(any(test, feature = "cargo-clippy")), no_std)]
 #![cfg_attr(not(test), no_main)]
-#![allow(clippy::upper_case_acronyms)]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
 mod acpi;
@@ -52,6 +53,7 @@ use arch::pic as PIC;
 use arch::Page;
 use arch::CPU;
 use core::marker::Sized;
+use core::ptr;
 use core::result;
 use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -87,7 +89,7 @@ static mut KPGTBL: PageTable = PageTable::empty();
 #[no_mangle]
 pub unsafe extern "C" fn main(boot_info: u64) {
     unsafe {
-        CPU::init(&mut PERCPU0, 0);
+        CPU::init(&mut *ptr::addr_of_mut!(PERCPU0), 0);
         console::init();
         println!("rxv64...");
         PIC::init();
@@ -95,22 +97,22 @@ pub unsafe extern "C" fn main(boot_info: u64) {
         trap::init();
         kalloc::early_init(kmem::early_pages());
         kmem::early_init(boot_info);
-        vm::init(&mut KPGTBL);
-        vm::switch(&KPGTBL);
+        vm::init(&mut *ptr::addr_of_mut!(KPGTBL));
+        KPGTBL.switch();
         acpi::init();
         ioapic::init(acpi::ioapics());
         xapic::init();
         kbd::init();
         uart::init();
         // Note: pci::init() calls sd::init.
-        pci::init(&mut KPGTBL);
+        pci::init(&mut *ptr::addr_of_mut!(KPGTBL));
         bio::init();
         pipe::init();
         syscall::init();
         smp::init();
         smp::start_others(acpi::cpus());
         kmem::init();
-        proc::init(&KPGTBL);
+        proc::init(& *ptr::addr_of!(KPGTBL));
     }
 
     let semaphore = AtomicBool::new(false);
@@ -125,7 +127,7 @@ pub unsafe extern "C" fn mpenter(percpu: &mut Page, id: u32, semaphore: &AtomicB
     unsafe {
         CPU::init(percpu, id);
         trap::init();
-        vm::switch(&KPGTBL);
+        KPGTBL.switch();
         xapic::init();
         syscall::init();
     }

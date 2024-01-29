@@ -225,7 +225,7 @@ pub mod op {
     }
 
     fn commit() {
-        let log = unsafe { &mut LOG };
+        let log = unsafe { &mut *core::ptr::addr_of_mut!(LOG) };
         if !log.is_empty() {
             log.sync();
             log.write();
@@ -245,7 +245,7 @@ pub fn with_op<U, F: FnMut() -> U>(mut thunk: F) -> U {
 
 pub unsafe fn init(dev: u32, sb: &fs::Superblock) {
     fn recover() {
-        let log = unsafe { &mut LOG };
+        let log = unsafe { &mut *core::ptr::addr_of_mut!(LOG) };
         log.read();
         log.commit();
         log.clear();
@@ -260,7 +260,7 @@ pub unsafe fn init(dev: u32, sb: &fs::Superblock) {
 pub fn write(bp: &bio::Buf) {
     assert!(bp.is_locked());
     let state = LOG_STATE.lock();
-    let log = unsafe { &mut LOG };
+    let log = unsafe { &mut *core::ptr::addr_of_mut!(LOG) };
     if log.is_full() {
         panic!("transaction too big");
     }

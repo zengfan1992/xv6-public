@@ -269,7 +269,7 @@ impl Proc {
 
     pub unsafe fn switch_pgtbl(&self, pgtbl: vm::PageTable) -> Option<vm::PageTable> {
         unsafe {
-            vm::switch(&pgtbl);
+            pgtbl.switch();
         }
         self.data.borrow_mut().pgtbl.replace(pgtbl)
     }
@@ -324,7 +324,7 @@ impl Proc {
         self.set_size(new_size);
         unsafe {
             // Flush the TLB.
-            vm::switch(self.data.borrow().pgtbl.as_ref().expect("pgtbl"));
+            self.data.borrow().pgtbl.as_ref().expect("pgtbl").switch();
         }
         Ok(old_size)
     }
@@ -554,9 +554,9 @@ pub fn scheduler() {
             p.set_state(ProcState::RUNNING);
             arch::mycpu_mut().set_proc(p);
             unsafe {
-                vm::switch(p.data.borrow().pgtbl.as_ref().unwrap());
+                p.data.borrow().pgtbl.as_ref().unwrap().switch();
                 swtch(arch::mycpu_mut().mut_ptr_to_scheduler_ptr(), p.context());
-                vm::switch(&crate::KPGTBL);
+                crate::KPGTBL.switch();
             }
             arch::mycpu_mut().clear_proc();
         }

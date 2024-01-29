@@ -259,7 +259,7 @@ pub unsafe fn init(dev: u32) {
 }
 
 pub unsafe fn superblock() -> &'static Superblock {
-    unsafe { &SUPERBLOCK }
+    unsafe { &*core::ptr::addr_of!(SUPERBLOCK) }
 }
 
 #[allow(clippy::mut_from_ref)]
@@ -831,7 +831,7 @@ fn is_dir(ip: &Inode) -> Result<&Inode> {
 
 pub fn namex(mut path: &[u8]) -> Result<&'static Inode> {
     let mut ip = if !path.is_empty() && path[0] == b'/' {
-        let sb = unsafe { &SUPERBLOCK };
+        let sb = unsafe { superblock() };
         Inode::get(param::ROOTDEV, ROOTINO, sb)?
     } else {
         proc::myproc().cwd().dup()

@@ -440,6 +440,15 @@ impl PageTable {
         }
         Ok(())
     }
+
+    /// # Safety
+    /// The caller must ensure that the table is valid and correctly
+    /// maps the address space.
+    pub unsafe fn switch(&self) {
+        unsafe {
+            switch(self);
+        }
+    }
 }
 
 impl fmt::Debug for PageTable {

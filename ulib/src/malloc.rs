@@ -37,7 +37,7 @@ fn bytes2units(bytes: usize) -> usize {
 }
 
 pub unsafe extern "C" fn krmalloc(n: usize) -> *mut u8 {
-    if let Some(s) = inner_malloc(unsafe { &mut FREE_LIST }, n) {
+    if let Some(s) = inner_malloc(unsafe { &mut *ptr::addr_of_mut!(FREE_LIST) }, n) {
         unsafe { s.add(1).cast::<u8>() }
     } else {
         ptr::null_mut()
@@ -47,7 +47,7 @@ pub unsafe extern "C" fn krmalloc(n: usize) -> *mut u8 {
 fn inner_malloc(free_list: &mut Option<*mut Header>, n: usize) -> Option<*mut Header> {
     if n != 0 {
         if free_list.is_none() {
-            let base = unsafe { &mut BASE };
+            let base = unsafe { &mut *ptr::addr_of_mut!(BASE) };
             unsafe {
                 ptr::write(base, Header::new(0, base));
             }
@@ -122,7 +122,7 @@ pub unsafe extern "C" fn krfree(p: *mut u8) {
     if p.eq(&ptr::null_mut()) {
         return;
     }
-    inner_free(unsafe { &mut FREE_LIST }, ptr2tag(p));
+    inner_free(unsafe { &mut *ptr::addr_of_mut!(FREE_LIST) }, ptr2tag(p));
 }
 
 fn inner_free(free_list: &mut Option<*mut Header>, tag: &mut Header) -> *mut Header {
@@ -173,7 +173,7 @@ mod tests {
     static MSYNC: Mutex<()> = Mutex::new(());
 
     fn printfree() {
-        let Some(free_list) = (unsafe { &super::FREE_LIST }) else {
+        let Some(free_list) = (unsafe { &*ptr::addr_of!(super::FREE_LIST) }) else {
             println!("None");
             return;
         };
