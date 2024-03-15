@@ -1,7 +1,6 @@
 use crate::arch;
 use arch::{cpu_relax, mycpu_id, xswap, CPU};
 use core::cell::UnsafeCell;
-use core::marker::{Send, Sized, Sync};
 use core::ops::{Deref, DerefMut};
 
 #[derive(Debug)]

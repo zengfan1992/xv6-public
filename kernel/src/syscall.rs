@@ -4,7 +4,6 @@ use crate::proc::{self, myproc};
 use crate::sysfile;
 use crate::trap;
 use core::arch::asm;
-use core::convert::TryInto;
 use core::fmt::Debug;
 
 pub unsafe fn init() {

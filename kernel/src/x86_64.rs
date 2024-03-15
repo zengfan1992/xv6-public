@@ -393,9 +393,12 @@ impl CPU {
     #[allow(clippy::cast_ptr_alignment)]
     pub unsafe fn init(page: &mut Page, id: u32) {
         let cpu = unsafe { &mut *(page.as_ptr_mut() as *mut CPU) };
-        let nmi_stack = unsafe { &mut *(&mut page.0[1024] as *mut u8 as *mut SmallStack) };
-        let db_stack = unsafe { &mut *(&mut page.0[1024 + 512] as *mut u8 as *mut SmallStack) };
-        let dbl_flt_stack = unsafe { &mut *(&mut page.0[2048] as *mut u8 as *mut SmallStack) };
+        let nmi_stack =
+            unsafe { &mut *(page.0.as_mut_ptr().wrapping_add(1024) as *mut SmallStack) };
+        let db_stack =
+            unsafe { &mut *(page.0.as_mut_ptr().wrapping_add(1024 + 512) as *mut SmallStack) };
+        let dbl_flt_stack =
+            unsafe { &mut *(page.0.as_mut_ptr().wrapping_add(2048) as *mut SmallStack) };
         *cpu = CPU {
             self_ptr: cpu,
             ureg: 0,

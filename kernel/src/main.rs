@@ -52,7 +52,6 @@ use crate::x86_64 as arch;
 use arch::pic as PIC;
 use arch::Page;
 use arch::CPU;
-use core::marker::Sized;
 use core::ptr;
 use core::result;
 use core::sync::atomic::{AtomicBool, Ordering};

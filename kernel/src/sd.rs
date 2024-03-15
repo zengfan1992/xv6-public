@@ -12,8 +12,6 @@ use crate::spinlock::SpinMutex as Mutex;
 use crate::volatile;
 use crate::xapic;
 use bitflags::bitflags;
-use core::convert::TryFrom;
-use core::convert::TryInto;
 use core::mem;
 use core::time::Duration;
 use static_assertions::const_assert_eq;
