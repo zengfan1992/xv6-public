@@ -69,7 +69,7 @@ fn inner_malloc(free_list: &mut Option<*mut Header>, n: usize) -> Option<*mut He
                     mp.nunits -= nunits;
                     let p = unsafe { (mp as *mut Header).add(mp.nunits) };
                     unsafe {
-                        ptr::write(ptr::from_exposed_addr_mut(p.addr()), Header::new(nunits, mp.next));
+                        ptr::write(ptr::without_provenance_mut(p.addr()), Header::new(nunits, mp.next));
                     }
                     p
                 };
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn krfree(p: *mut u8) {
         assert_eq!(p.addr() % mem::align_of::<Header>(), 0);
         let hp = p.addr();
         unsafe {
-            &mut *(ptr::from_exposed_addr_mut::<Header>(hp).sub(1))
+            &mut *(ptr::without_provenance_mut::<Header>(hp).sub(1))
         }
     }
     if p.eq(&ptr::null_mut()) {

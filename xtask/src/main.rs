@@ -328,7 +328,7 @@ fn accelrun() -> Result<()> {
     dist(profile)?;
     let status = Command::new(qemu_system_x86_64())
         //.arg("-nographic")
-        //.arg("-curses")
+        .arg("-display").arg("curses")
         .arg("-accel")
         .arg("kvm")
         .arg("-M")

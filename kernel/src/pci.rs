@@ -156,12 +156,12 @@ impl Conf {
     }
 
     pub fn read<T>(&self, offset: usize) -> T {
-        let addr = ptr::from_exposed_addr::<T>(self.addr(offset));
+        let addr = ptr::without_provenance::<T>(self.addr(offset));
         unsafe { ptr::read_volatile(addr) }
     }
 
     pub fn write<T>(&self, offset: usize, val: T) {
-        let addr = ptr::from_exposed_addr_mut::<T>(self.addr(offset));
+        let addr = ptr::without_provenance_mut::<T>(self.addr(offset));
         unsafe {
             ptr::write_volatile(addr, val);
         }
