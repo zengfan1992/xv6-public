@@ -115,7 +115,7 @@ mod fis {
     /// A device to host register.
     #[derive(Default)]
     #[repr(C)]
-    pub(super) struct RegD2H {
+    pub(super) struct _RegD2H {
         // u32 0
         fis_type: u8,
         rirr_port: u8,

@@ -4,12 +4,11 @@
 #![feature(const_mut_refs)]
 #![feature(core_intrinsics)]
 #![feature(exposed_provenance)]
-#![feature(inline_const)]
 #![feature(naked_functions)]
 #![feature(proc_macro_hygiene)]
 #![feature(strict_provenance)]
 #![cfg_attr(test, allow(dead_code))]
-#![cfg_attr(not(any(test, feature = "cargo-clippy")), no_std)]
+#![cfg_attr(not(any(test, clippy)), no_std)]
 #![cfg_attr(not(test), no_main)]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
@@ -143,7 +142,7 @@ fn signal_up(semaphore: &AtomicBool) {
     semaphore.store(true, Ordering::Release);
 }
 
-#[cfg(not(any(test, feature = "cargo-clippy")))]
+#[cfg(not(any(test, clippy)))]
 mod runtime {
     use super::{AtomicBool, Ordering};
     use core::panic::PanicInfo;

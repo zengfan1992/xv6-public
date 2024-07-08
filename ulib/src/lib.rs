@@ -3,7 +3,7 @@
 #![feature(exposed_provenance)]
 #![feature(naked_functions)]
 #![feature(strict_provenance)]
-#![cfg_attr(not(any(test, feature = "cargo-clippy")), no_std)]
+#![cfg_attr(not(any(test, clippy)), no_std)]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
 use core::cmp;
@@ -158,7 +158,7 @@ pub unsafe extern "C" fn rvdprintf(fd: i32, fmt: *const u8, ap: ffi::VaList) {
 
 /// # Safety
 /// C interface
-#[cfg(not(any(test, feature = "cargo-clippy")))]
+#[cfg(not(any(test, clippy)))]
 #[no_mangle]
 pub unsafe extern "C" fn malloc(n: usize) -> *mut u8 {
     unsafe { malloc::krmalloc(n) }
@@ -166,7 +166,7 @@ pub unsafe extern "C" fn malloc(n: usize) -> *mut u8 {
 
 /// # Safety
 /// C interface
-#[cfg(not(any(test, feature = "cargo-clippy")))]
+#[cfg(not(any(test, clippy)))]
 #[no_mangle]
 pub unsafe extern "C" fn free(p: *mut u8) {
     unsafe {
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn free(p: *mut u8) {
     }
 }
 
-#[cfg(not(any(test, feature = "cargo-clippy")))]
+#[cfg(not(any(test, clippy)))]
 #[panic_handler]
 pub fn panic(_info: &core::panic::PanicInfo) -> ! {
     #[allow(clippy::empty_loop)]
