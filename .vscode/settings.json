@@ -1,0 +1,22 @@
+{
+    "files.exclude": {
+        "*~": true,
+        "_*": true,
+        "*.o": true,
+        "*.d": true,
+        "*.asm": true,
+        "*.sym": true,
+        "*.img": true,
+        "vectors.S": true,
+        "bootblock": true,
+        "entryother": true,
+        "initcode": true,
+        "initcode.out": true,
+        "kernel": true,
+        "kernelmemfs": true,
+        "mkfs": true,
+        ".gdbinit": true,
+        "bx_enh_dbg.ini": true,
+        ".vscode": true,
+    }
+}
