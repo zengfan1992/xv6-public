@@ -14,3 +14,4 @@ kernel
 kernelmemfs
 mkfs
 .gdbinit
+bx_enh_dbg.ini
