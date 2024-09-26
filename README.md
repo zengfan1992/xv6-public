@@ -10,3 +10,10 @@ PCIe AHCI SATA storage devices.
 
 See the xv6 README for more information on provenance and intended
 use.
+
+cd bin && gcc mkfs.c -o mkfs
+sudo apt install clang llvm lld
+
+cargo xtask build --release
+cd cmd && sh mk
+cargo xtask run

@@ -289,6 +289,7 @@ fn clippy(profile: Build) -> Result<()> {
 // qemu-system-x86_64 -cpu qemu64,pdpe1gb,xsaveopt,fsgsbase,apic,msr -smp 8 -m 8192 -nographic -kernel root/rxv64.elf
 // qemu-system-x86_64 -cpu host,pdpe1gb,xsaveopt,fsgsbase,apic,msr -accel kvm -smp 8 -m 8192 -curses "$@" -kernel root/rxv64.elf
 fn run() -> Result<()> {
+    println!("run 123");
     let profile = Build::Release;
     dist(profile)?;
     let status = Command::new(qemu_system_x86_64())
@@ -300,9 +301,9 @@ fn run() -> Result<()> {
         .arg("-cpu")
         .arg("qemu64,pdpe1gb,xsaveopt,fsgsbase,apic,msr")
         .arg("-smp")
-        .arg("8")
+        .arg("2")
         .arg("-m")
-        .arg("8192")
+        .arg("256")
         .arg("-device")
         .arg("ahci,id=ahci0")
         .arg("-drive")
@@ -328,7 +329,8 @@ fn accelrun() -> Result<()> {
     dist(profile)?;
     let status = Command::new(qemu_system_x86_64())
         //.arg("-nographic")
-        .arg("-display").arg("curses")
+        .arg("-display")
+        .arg("curses")
         .arg("-accel")
         .arg("kvm")
         .arg("-M")
@@ -336,9 +338,9 @@ fn accelrun() -> Result<()> {
         .arg("-cpu")
         .arg("host,pdpe1gb,xsaveopt,fsgsbase,apic,msr")
         .arg("-smp")
-        .arg("8")
+        .arg("2")
         .arg("-m")
-        .arg("8192")
+        .arg("256")
         .arg("-device")
         .arg("ahci,id=ahci0")
         .arg("-drive")
